@@ -1,0 +1,25 @@
+
+config EXAMPLES_UWBINS
+	tristate "6DoF tracker using UWB and IMU"
+	default y
+	---help---
+		Enable the uwbins app
+
+if EXAMPLES_UWBINS
+
+config EXAMPLES_UWBINS_PROGNAME
+	string "Program name"
+	default "uwbins"
+	---help---
+		This is the name of the program that will be use when the NSH ELF
+		program is installed.
+
+config EXAMPLES_UWBINS_PRIORITY
+	int "uwbins task priority"
+	default 100
+
+config EXAMPLES_UWBINS_STACKSIZE
+	int "uwbins stack size"
+	default 2048
+
+endif
