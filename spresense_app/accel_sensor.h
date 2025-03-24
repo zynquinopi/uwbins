@@ -38,26 +38,16 @@ public:
 
   ~AccelSensorClass() {};
 
-  struct accel_float_s {
-    float x; /* X axis standard gravity acceleration.[G] */
-    float y; /* Y axis standard gravity acceleration.[G] */
-    float z; /* Z axis standard gravity acceleration.[G] */
-  };
-  typedef struct accel_float_s accel_float_t;
-
   private:
   /* Override method */
   int open_sensor();
   int close_sensor();
   int start_sensor();
   int stop_sensor();
-
   int setup_sensor(FAR void *param);
 
   /* Local method */
   int read_data();
-  void convert_data(FAR cxd5602pwbimu_data_t *p_src,
-                    FAR accel_float_t *p_dst);
   int notify_data(MemMgrLite::MemHandle &mh_dst);
 
   /* Inline method */

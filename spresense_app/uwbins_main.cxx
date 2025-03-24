@@ -137,13 +137,14 @@ static int accel_read_callback(uint32_t ev_type,
     packet.mh = mh;
     SS_SendSensorDataMH(&packet);
 
-    FAR AccelSensorClass::accel_float_t *data_top = NULL;
-    data_top = static_cast<AccelSensorClass::accel_float_t *>(mh.getVa());
-    for (int i = 0; i < 1; i++) {
-        printf("x=%f ,y=%f ,z=%f\n", data_top[i].x, data_top[i].y, data_top[i].z);
+    FAR cxd5602pwbimu_data_t *data = NULL;
+    data = static_cast<cxd5602pwbimu_data_t *>(mh.getVa());
+    for (int i = 0; i < IMU_NUM_FIFO; i++) {
+        printf("ts=%lu,temp=%f,ax=%f,ay=%f,az=%f,gx=%f,gy=%f,gz=%f\n",
+               data[i].timestamp, data[i].temp,
+               data[i].ax, data[i].ay, data[i].az,
+               data[i].gx, data[i].gy, data[i].gz);
     }
-    
-
     return 0;
 }
 

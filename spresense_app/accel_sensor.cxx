@@ -116,22 +116,14 @@ int AccelSensorClass::setup_sensor(FAR void *param) {
 
 int AccelSensorClass::read_data() {
     MemMgrLite::MemHandle mh_src;
-    MemMgrLite::MemHandle mh_dst;
     FAR char *p_src;
-    FAR char *p_dst;
 
     /* Get segment of memory handle. */
-    if (ERR_OK != mh_src.allocSeg(S0_ACCEL_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
+    if (ERR_OK != mh_src.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
         err("Fail to allocate segment of memory handle.\n");
         ASSERT(0);
     }
     p_src = reinterpret_cast<char *>(mh_src.getPa());
-
-    if (ERR_OK != mh_dst.allocSeg(S0_ACCEL_DATA_BUF_POOL, sizeof(accel_float_t))) {
-        err("Fail to allocate segment of memory handle.\n");
-        ASSERT(0);
-    }
-    p_dst = reinterpret_cast<char *>(mh_dst.getPa());
 
     /* Read accelerometer data from driver. */
     int ret = poll(fds, 1, 1000);
@@ -149,38 +141,12 @@ int AccelSensorClass::read_data() {
             err("ERROR: read failed. %d\n", errno);
         }
     }
-    for (int i = 0; i < IMU_NUM_FIFO; i++) {
-        cxd5602pwbimu_data_t *data = reinterpret_cast<cxd5602pwbimu_data_t *>(p_src + i * sizeof(cxd5602pwbimu_data_t));
-        // printf("timestamp = %.6f, ax = %f, ay = %f, az = %f\n",
-        //        data->timestamp / 19200000.0f, data->ax, data->ay, data->az);
-        // printf("%.6f\n", data->timestamp / 19200000.0f);
-    }
-    this->convert_data(reinterpret_cast<FAR cxd5602pwbimu_data_t *>(p_src),
-                       reinterpret_cast<FAR accel_float_t *>(p_dst));
 
     /* Notify accelerometer data to sensor manager. */
-    this->notify_data(mh_dst);
+    this->notify_data(mh_src);
 
-    /* Free segment. */
     mh_src.freeSeg();
-    mh_dst.freeSeg();
-
     return 0;
-}
-
-
-void AccelSensorClass::convert_data(FAR cxd5602pwbimu_data_t *p_src,
-                                    FAR accel_float_t *p_dst) {
-    for (int i = 0; i < IMU_NUM_FIFO; i++) {
-        cxd5602pwbimu_data_t *data = reinterpret_cast<cxd5602pwbimu_data_t *>(p_src + i * sizeof(cxd5602pwbimu_data_t));
-        accel_float_t *accel_data = reinterpret_cast<accel_float_t *>(p_dst + i * sizeof(accel_float_t));
-        accel_data->x = data->ax;
-        accel_data->y = data->ay;
-        accel_data->z = data->az;
-
-        // printf("timestamp = %.6f, ax = %f, ay = %f, az = %f\n",
-        //         data->timestamp / 19200000.0f, p_dst->x, p_dst->y, p_dst->z);
-    }
 }
 
 

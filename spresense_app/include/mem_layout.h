@@ -2,7 +2,7 @@
 /****************************************************************************
  * mem_layout.h
  *
- *   Copyright 2023 Sony Semiconductor Solutions Corporation
+ *   Copyright 2025 Sony Semiconductor Solutions Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -95,7 +95,7 @@
 
 const MemMgrLite::PoolId S0_NULL_POOL                = { 0, SECTION_NO0};  /*  0 */
 const MemMgrLite::PoolId S0_SENSOR_DSP_CMD_BUF_POOL  = { 1, SECTION_NO0};  /*  1 */
-const MemMgrLite::PoolId S0_ACCEL_DATA_BUF_POOL      = { 2, SECTION_NO0};  /*  2 */
+const MemMgrLite::PoolId S0_IMU_DATA_BUF_POOL        = { 2, SECTION_NO0};  /*  2 */
 const MemMgrLite::PoolId S0_GNSS_DATA_BUF_POOL       = { 3, SECTION_NO0};  /*  3 */
 
 #define NUM_MEM_S0_LAYOUTS   1
@@ -118,18 +118,18 @@ const MemMgrLite::PoolId S0_GNSS_DATA_BUF_POOL       = { 3, SECTION_NO0};  /*  3
 #define S0_L0_SENSOR_DSP_CMD_BUF_POOL_NUM_SEG  0x00000008
 #define S0_L0_SENSOR_DSP_CMD_BUF_POOL_SEG_SIZE 0x00000070
 
-#define S0_L0_ACCEL_DATA_BUF_POOL_ALIGN    0x00000008
-#define S0_L0_ACCEL_DATA_BUF_POOL_ADDR     0x000e0380
-#define S0_L0_ACCEL_DATA_BUF_POOL_SIZE     0x00000c00
-#define S0_L0_ACCEL_DATA_BUF_POOL_NUM_SEG  0x00000008
-#define S0_L0_ACCEL_DATA_BUF_POOL_SEG_SIZE 0x00000180
+#define S0_L0_IMU_DATA_BUF_POOL_ALIGN    0x00000008
+#define S0_L0_IMU_DATA_BUF_POOL_ADDR     0x000e0380
+#define S0_L0_IMU_DATA_BUF_POOL_SIZE     0x00000400
+#define S0_L0_IMU_DATA_BUF_POOL_NUM_SEG  0x00000008
+#define S0_L0_IMU_DATA_BUF_POOL_SEG_SIZE 0x00000080
 
 #define S0_L0_GNSS_DATA_BUF_POOL_ALIGN    0x00000008
-#define S0_L0_GNSS_DATA_BUF_POOL_ADDR     0x000e0f80
+#define S0_L0_GNSS_DATA_BUF_POOL_ADDR     0x000e0780
 #define S0_L0_GNSS_DATA_BUF_POOL_SIZE     0x00000180
 #define S0_L0_GNSS_DATA_BUF_POOL_NUM_SEG  0x00000008
 #define S0_L0_GNSS_DATA_BUF_POOL_SEG_SIZE 0x00000030
 
-/* Remainder SENSOR_WORK_AREA=0x0001cf00 */
+/* Remainder SENSOR_WORK_AREA=0x0001d700 */
 
 #endif /* MEM_LAYOUT_H_INCLUDED */
