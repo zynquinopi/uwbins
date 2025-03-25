@@ -9,6 +9,7 @@
 //  #endif
 
 #include "include/imu_sensor.h"
+#include "include/uwb_sensor.h"
 //  #include "gnss_sensor.h"
 #include "sensing/sensor_api.h"
 #include "sensing/logical_sensor/step_counter.h"
@@ -140,6 +141,30 @@ static int imu_read_callback(uint32_t ev_type,
 }
 
 
+static int uwb_read_callback(uint32_t ev_type,
+                             uint32_t timestamp,
+                             MemMgrLite::MemHandle &mh) {
+    sensor_command_data_mh_t packet;
+    packet.header.size = 0;
+    packet.header.code = SendData;
+    packet.self = accelID; //TODO
+    packet.time = timestamp;
+    packet.fs = UWB_SAMPLING_FREQUENCY;
+    packet.size = UWB_NUM_ANCHOR;
+    packet.mh = mh;
+    SS_SendSensorDataMH(&packet);
+
+    FAR UwbSensorClass::type2bp_data_s *data = NULL;
+    data = static_cast<UwbSensorClass::type2bp_data_s *>(mh.getVa());
+    for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
+        printf("ts=%lu,anchor_id=%lu,nlos=%lu,distance=%f,azimuth=%f,elevation=%f\n",
+            data[i].timestamp, data[i].anchor_id,data[i].nlos,
+            data[i].distance, data[i].azimuth, data[i].elevation);
+    }
+    return 0;
+}
+
+
 //  #ifdef CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS
 //  static int gnss_read_callback(uint32_t context, FAR GnssSampleData *pos)
 //  {
@@ -254,9 +279,15 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    FAR physical_sensor_t *sensor = ImuSensorCreate(imu_read_callback);
-    if (sensor == NULL) {
+    FAR physical_sensor_t *imu = ImuSensorCreate(imu_read_callback);
+    if (imu == NULL) {
         err("Error: ImuSensorCreate() failure.\n");
+        return EXIT_FAILURE;
+    }
+
+    FAR physical_sensor_t *uwb = UwbSensorCreate(uwb_read_callback);
+    if (uwb == NULL) {
+        err("Error: UwbSensorCreate() failure.\n");
         return EXIT_FAILURE;
     }
 
@@ -356,13 +387,21 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     message("start sensoring...\n");
 
     /* Start physical sensor process. */
-    if (ImuSensorOpen(sensor) < 0) {
+    if (ImuSensorOpen(imu) < 0) {
         err("Error: ImuSensorOpen() failure.\n");
         return EXIT_FAILURE;
     }
-
-    if (ImuSensorStart(sensor) < 0) {
+    if (ImuSensorStart(imu) < 0) {
         err("Error: ImuSensorStart() failure.\n");
+        return EXIT_FAILURE;
+    }
+
+    if (UwbSensorOpen(uwb) < 0) {
+        err("Error: UwbSensorOpen() failure.\n");
+        return EXIT_FAILURE;
+    }
+    if (UwbSensorStart(uwb) < 0) {
+        err("Error: UwbSensorStart() failure.\n");
         return EXIT_FAILURE;
     }
 
@@ -374,14 +413,6 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     //                (FAR char * const *)NULL);
     //  #endif
 
-#ifdef CONFIG_CPUFREQ_RELEASE_LOCK
-    message("-----------------------\n");
-    message("       step,  move-type\n");
-#else
-    message("-------------------------------------------------------------------------------------\n");
-    message("      tempo,     stride,      speed,   distance,    t-stamp,       step,  move-type\n");
-#endif
-
     while (1) {
         /* Wait exit request. */
         if (fgetc(stdin) == EXIT_REQUEST_KEY) {
@@ -392,12 +423,21 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     }
 
     /* Stop physical sensor. */
-    if (ImuSensorStop(sensor) < 0) {
+    if (ImuSensorStop(imu) < 0) {
         err("Error: ImuSensorStop() failure.\n");
         return EXIT_FAILURE;
     }
-    if (ImuSensorClose(sensor) < 0) {
+    if (ImuSensorClose(imu) < 0) {
         err("Error: ImuSensorClose() failure.\n");
+        return EXIT_FAILURE;
+    }
+
+    if (UwbSensorStop(uwb) < 0) {
+        err("Error: UwbSensorStop() failure.\n");
+        return EXIT_FAILURE;
+    }
+    if (UwbSensorClose(uwb) < 0) {
+        err("Error: UwbSensorClose() failure.\n");
         return EXIT_FAILURE;
     }
 
@@ -445,7 +485,8 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    ImuSensorDestroy(sensor);
+    ImuSensorDestroy(imu);
+    UwbSensorDestroy(uwb);
     sensor_finalize_libraries();
     return EXIT_SUCCESS;
 }

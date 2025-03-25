@@ -12,7 +12,8 @@ CSRCS =
 MAINSRC = uwbins_main.cxx
 CXXSRCS = \
 	src/physical_sensor.cxx \
-	src/imu_sensor.cxx 
+	src/imu_sensor.cxx \
+	src/uwb_sensor.cxx \
 # gnss_sensor.cxx
 
 CXXFLAGS += -D_POSIX

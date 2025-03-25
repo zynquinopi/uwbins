@@ -51,13 +51,14 @@ uint8_t layout_no[NUM_MEM_SECTIONS] = {
 uint8_t pool_num[NUM_MEM_SECTIONS] = {
   NUM_MEM_S0_POOLS,
 };
-extern const PoolSectionAttr MemoryPoolLayouts[NUM_MEM_SECTIONS][NUM_MEM_LAYOUTS][4] = {
+extern const PoolSectionAttr MemoryPoolLayouts[NUM_MEM_SECTIONS][NUM_MEM_LAYOUTS][5] = {
   {  /* Section:0 */
     {/* Layout:0 */
      /* pool_ID                          type         seg  fence  addr        size         */
       { S0_SENSOR_DSP_CMD_BUF_POOL     , BasicType  ,   8, false, 0x000e0000, 0x00000380 },  /* SENSOR_WORK_AREA */
       { S0_IMU_DATA_BUF_POOL           , BasicType  ,   8, false, 0x000e0380, 0x00000400 },  /* SENSOR_WORK_AREA */
-      { S0_GNSS_DATA_BUF_POOL          , BasicType  ,   8, false, 0x000e0780, 0x00000180 },  /* SENSOR_WORK_AREA */
+      { S0_UWB_DATA_BUF_POOL           , BasicType  ,   8, false, 0x000e0780, 0x00000300 },  /* SENSOR_WORK_AREA */
+      { S0_GNSS_DATA_BUF_POOL          , BasicType  ,   8, false, 0x000e0a80, 0x00000180 },  /* SENSOR_WORK_AREA */
       { S0_NULL_POOL, 0, 0, false, 0, 0 },
     },
   },

@@ -75,7 +75,7 @@
  */
 
 #define S0_MEMMGR_WORK_AREA_ADDR  MEMMGR_WORK_AREA_ADDR
-#define S0_MEMMGR_WORK_AREA_SIZE  0x00000060
+#define S0_MEMMGR_WORK_AREA_SIZE  0x00000080
 
 /*
  * Section IDs
@@ -96,13 +96,14 @@
 const MemMgrLite::PoolId S0_NULL_POOL                = { 0, SECTION_NO0};  /*  0 */
 const MemMgrLite::PoolId S0_SENSOR_DSP_CMD_BUF_POOL  = { 1, SECTION_NO0};  /*  1 */
 const MemMgrLite::PoolId S0_IMU_DATA_BUF_POOL        = { 2, SECTION_NO0};  /*  2 */
-const MemMgrLite::PoolId S0_GNSS_DATA_BUF_POOL       = { 3, SECTION_NO0};  /*  3 */
+const MemMgrLite::PoolId S0_UWB_DATA_BUF_POOL        = { 3, SECTION_NO0};  /*  3 */
+const MemMgrLite::PoolId S0_GNSS_DATA_BUF_POOL       = { 4, SECTION_NO0};  /*  4 */
 
 #define NUM_MEM_S0_LAYOUTS   1
-#define NUM_MEM_S0_POOLS     4
+#define NUM_MEM_S0_POOLS     5
 
 #define NUM_MEM_LAYOUTS      1
-#define NUM_MEM_POOLS        4
+#define NUM_MEM_POOLS        5
 
 /*
  * Pool areas
@@ -110,7 +111,7 @@ const MemMgrLite::PoolId S0_GNSS_DATA_BUF_POOL       = { 3, SECTION_NO0};  /*  3
 
 /* Section0 Layout0: */
 
-#define MEMMGR_S0_L0_WORK_SIZE   0x00000060
+#define MEMMGR_S0_L0_WORK_SIZE   0x00000080
 
 #define S0_L0_SENSOR_DSP_CMD_BUF_POOL_ALIGN    0x00000008
 #define S0_L0_SENSOR_DSP_CMD_BUF_POOL_ADDR     0x000e0000
@@ -124,12 +125,18 @@ const MemMgrLite::PoolId S0_GNSS_DATA_BUF_POOL       = { 3, SECTION_NO0};  /*  3
 #define S0_L0_IMU_DATA_BUF_POOL_NUM_SEG  0x00000008
 #define S0_L0_IMU_DATA_BUF_POOL_SEG_SIZE 0x00000080
 
+#define S0_L0_UWB_DATA_BUF_POOL_ALIGN    0x00000008
+#define S0_L0_UWB_DATA_BUF_POOL_ADDR     0x000e0780
+#define S0_L0_UWB_DATA_BUF_POOL_SIZE     0x00000300
+#define S0_L0_UWB_DATA_BUF_POOL_NUM_SEG  0x00000008
+#define S0_L0_UWB_DATA_BUF_POOL_SEG_SIZE 0x00000060
+
 #define S0_L0_GNSS_DATA_BUF_POOL_ALIGN    0x00000008
-#define S0_L0_GNSS_DATA_BUF_POOL_ADDR     0x000e0780
+#define S0_L0_GNSS_DATA_BUF_POOL_ADDR     0x000e0a80
 #define S0_L0_GNSS_DATA_BUF_POOL_SIZE     0x00000180
 #define S0_L0_GNSS_DATA_BUF_POOL_NUM_SEG  0x00000008
 #define S0_L0_GNSS_DATA_BUF_POOL_SEG_SIZE 0x00000030
 
-/* Remainder SENSOR_WORK_AREA=0x0001d700 */
+/* Remainder SENSOR_WORK_AREA=0x0001d400 */
 
 #endif /* MEM_LAYOUT_H_INCLUDED */
