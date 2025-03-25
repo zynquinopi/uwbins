@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
-#include "physical_sensor.h"
+#include "include/physical_sensor.h"
 
 
 #define MQ_REQ_MAX_NUM 1

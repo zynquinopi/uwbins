@@ -9,8 +9,8 @@
 #include <nuttx/queue.h>
 
 #include "memutils/memory_manager/MemHandle.h"
-#include "include/mem_layout.h"
-#include "include/msgq_id.h"
+#include "include/mem_conf/mem_layout.h"
+#include "include/mem_conf/msgq_id.h"
 
 
 #define PHYSICAL_SENSOR_ERR_CODE_OK       0   /* Success.                    */

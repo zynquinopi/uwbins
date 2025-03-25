@@ -8,19 +8,19 @@
 #include <errno.h>
 #include <nuttx/sensors/cxd5602pwbimu.h>
 
-#include "accel_sensor.h"
+#include "include/imu_sensor.h"
 
 
-#define STEP_COUNTER_ACCEL_DEVNAME "/dev/imu0"
+#define UWBINS_IMU_DEVNAME "/dev/imu0"
 
 #define err(format, ...)    fprintf(stderr, format, ##__VA_ARGS__)
 
 
-static FAR void *accel_sensor_entry(pthread_addr_t arg) {
+static FAR void *imu_sensor_entry(pthread_addr_t arg) {
     static int s_sensor_entry_result = PHYSICAL_SENSOR_ERR_CODE_OK;
     FAR physical_sensor_t *sensor = reinterpret_cast<FAR physical_sensor_t *>(arg);
 
-    AccelSensorClass *instance = new AccelSensorClass(sensor);
+    ImuSensorClass *instance = new ImuSensorClass(sensor);
 
     instance->run();
 
@@ -30,40 +30,40 @@ static FAR void *accel_sensor_entry(pthread_addr_t arg) {
 }
 
 
-FAR physical_sensor_t *AccelSensorCreate(pysical_event_handler_t handler) {
+FAR physical_sensor_t *ImuSensorCreate(pysical_event_handler_t handler) {
     return PhysicalSensorCreate(handler,
-                                (void *)accel_sensor_entry,
-                                "accel_sensor");
+                                (void *)imu_sensor_entry,
+                                "imu_sensor");
 }
 
 
-int AccelSensorOpen(FAR physical_sensor_t *sensor) {
+int ImuSensorOpen(FAR physical_sensor_t *sensor) {
     return PhysicalSensorOpen(sensor, NULL);
 }
 
 
-int AccelSensorStart(FAR physical_sensor_t *sensor) {
+int ImuSensorStart(FAR physical_sensor_t *sensor) {
     return PhysicalSensorStart(sensor);
 }
 
 
-int AccelSensorStop(FAR physical_sensor_t *sensor) {
+int ImuSensorStop(FAR physical_sensor_t *sensor) {
     return PhysicalSensorStop(sensor);
 }
 
 
-int AccelSensorClose(FAR physical_sensor_t *sensor) {
+int ImuSensorClose(FAR physical_sensor_t *sensor) {
     return PhysicalSensorClose(sensor);
 }
 
 
-int AccelSensorDestroy(FAR physical_sensor_t *sensor) {
+int ImuSensorDestroy(FAR physical_sensor_t *sensor) {
     return PhysicalSensorDestroy(sensor);
 }
 
 
-int AccelSensorClass::open_sensor() {
-    m_fd = open(STEP_COUNTER_ACCEL_DEVNAME, O_RDONLY);
+int ImuSensorClass::open_sensor() {
+    m_fd = open(UWBINS_IMU_DEVNAME, O_RDONLY);
     if (m_fd <= 0) {
         return -1;
     }
@@ -73,22 +73,22 @@ int AccelSensorClass::open_sensor() {
 }
 
 
-int AccelSensorClass::close_sensor() {
+int ImuSensorClass::close_sensor() {
     return close(m_fd);
 }
 
 
-int AccelSensorClass::start_sensor() {
+int ImuSensorClass::start_sensor() {
     return ioctl(m_fd, SNIOC_ENABLE, 1);
 }
 
 
-int AccelSensorClass::stop_sensor() {
+int ImuSensorClass::stop_sensor() {
     return ioctl(m_fd, SNIOC_ENABLE, 0);
 }
 
 
-int AccelSensorClass::setup_sensor(FAR void *param) {
+int ImuSensorClass::setup_sensor(FAR void *param) {
     int ret;
     cxd5602pwbimu_range_t range = {IMU_ACCEL_DRANGE, IMU_GYRO_DRANGE};
 
@@ -114,18 +114,18 @@ int AccelSensorClass::setup_sensor(FAR void *param) {
 }
 
 
-int AccelSensorClass::read_data() {
-    MemMgrLite::MemHandle mh_src;
-    FAR char *p_src;
+int ImuSensorClass::read_data() {
+    MemMgrLite::MemHandle mh;
+    FAR char *ptr;
 
     /* Get segment of memory handle. */
-    if (ERR_OK != mh_src.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
+    if (ERR_OK != mh.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
         err("Fail to allocate segment of memory handle.\n");
         ASSERT(0);
     }
-    p_src = reinterpret_cast<char *>(mh_src.getPa());
+    ptr = reinterpret_cast<char *>(mh.getPa());
 
-    /* Read accelerometer data from driver. */
+    /* Read imu data from driver. */
     int ret = poll(fds, 1, 1000);
     if (ret < 0) {
         if (errno != EINTR) {
@@ -136,21 +136,20 @@ int AccelSensorClass::read_data() {
         err("ERROR: poll timeout.\n");
     }
     if (fds[0].revents & POLLIN) {
-        ret = read(m_fd, p_src, sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
+        ret = read(m_fd, ptr, sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
         if (ret != sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO) {
             err("ERROR: read failed. %d\n", errno);
         }
     }
 
-    /* Notify accelerometer data to sensor manager. */
-    this->notify_data(mh_src);
+    this->notify_data(mh);
 
-    mh_src.freeSeg();
+    mh.freeSeg();
     return 0;
 }
 
 
-int AccelSensorClass::notify_data(MemMgrLite::MemHandle &mh_dst) {
+int ImuSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
     uint32_t timestamp = get_timestamp();
-    return m_handler(0, timestamp, mh_dst);
+    return m_handler(0, timestamp, mh);
 };

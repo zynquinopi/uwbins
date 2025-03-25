@@ -8,28 +8,19 @@
 //  #  include <arch/board/board.h>
 //  #endif
 
-#include "accel_sensor.h"
+#include "include/imu_sensor.h"
 //  #include "gnss_sensor.h"
 #include "sensing/sensor_api.h"
 #include "sensing/logical_sensor/step_counter.h"
 #include "memutils/message/Message.h"
 #include "memutils/memory_manager/MemHandle.h"
-#include "include/pool_layout.h"
-#include "include/msgq_pool.h"
-#include "include/fixed_fence.h"
+#include "include/mem_conf/pool_layout.h"
+#include "include/mem_conf/msgq_pool.h"
+#include "include/mem_conf/fixed_fence.h"
 
 #define SENSOR_SECTION SECTION_NO0
 
 using namespace MemMgrLite;
-
-#ifndef CONFIG_EXAMPLES_STEP_COUNTER_WALKING_STRIDE
-#define CONFIG_EXAMPLES_STEP_COUNTER_WALKING_STRIDE 60
-#endif
-#ifndef CONFIG_EXAMPLES_STEP_COUNTER_RUNNING_STRIDE
-#define CONFIG_EXAMPLES_STEP_COUNTER_RUNNING_STRIDE 80
-#endif
-
-#define ACCEL_DATA_BUFFER_NUM 4
 
 #define EXIT_REQUEST_KEY 0x20 /* space key */
 
@@ -124,7 +115,7 @@ static bool sensor_finalize_libraries(void) {
 }
 
 
-static int accel_read_callback(uint32_t ev_type,
+static int imu_read_callback(uint32_t ev_type,
                                uint32_t timestamp,
                                MemMgrLite::MemHandle &mh) {
     sensor_command_data_mh_t packet;
@@ -263,9 +254,9 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    FAR physical_sensor_t *sensor = AccelSensorCreate(accel_read_callback);
+    FAR physical_sensor_t *sensor = ImuSensorCreate(imu_read_callback);
     if (sensor == NULL) {
-        err("Error: AccelSensorCreate() failure.\n");
+        err("Error: ImuSensorCreate() failure.\n");
         return EXIT_FAILURE;
     }
 
@@ -365,13 +356,13 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     message("start sensoring...\n");
 
     /* Start physical sensor process. */
-    if (AccelSensorOpen(sensor) < 0) {
-        err("Error: AccelSensorOpen() failure.\n");
+    if (ImuSensorOpen(sensor) < 0) {
+        err("Error: ImuSensorOpen() failure.\n");
         return EXIT_FAILURE;
     }
 
-    if (AccelSensorStart(sensor) < 0) {
-        err("Error: AccelSensorStart() failure.\n");
+    if (ImuSensorStart(sensor) < 0) {
+        err("Error: ImuSensorStart() failure.\n");
         return EXIT_FAILURE;
     }
 
@@ -401,12 +392,12 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     }
 
     /* Stop physical sensor. */
-    if (AccelSensorStop(sensor) < 0) {
-        err("Error: AccelSensorStop() failure.\n");
+    if (ImuSensorStop(sensor) < 0) {
+        err("Error: ImuSensorStop() failure.\n");
         return EXIT_FAILURE;
     }
-    if (AccelSensorClose(sensor) < 0) {
-        err("Error: AccelSensorClose() failure.\n");
+    if (ImuSensorClose(sensor) < 0) {
+        err("Error: ImuSensorClose() failure.\n");
         return EXIT_FAILURE;
     }
 
@@ -454,7 +445,7 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    AccelSensorDestroy(sensor);
+    ImuSensorDestroy(sensor);
     sensor_finalize_libraries();
     return EXIT_SUCCESS;
 }
