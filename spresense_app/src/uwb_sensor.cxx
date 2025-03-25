@@ -68,6 +68,8 @@ int UwbSensorClass::open_sensor() {
     if (m_fd <= 0) {
         return -1;
     }
+    fds[0].fd = m_fd;
+    fds[0].events = POLLIN;
     return 0;
 }
 
@@ -113,48 +115,89 @@ int UwbSensorClass::setup_sensor(FAR void *param) {
 
 
 int UwbSensorClass::read_data() {
+    char buffer[256]; //TDOO : use Memory pool
+    size_t buffer_index = 0;
     MemMgrLite::MemHandle mh;
     FAR char *ptr;
 
     /* Get segment of memory handle. */
     if (ERR_OK != mh.allocSeg(S0_UWB_DATA_BUF_POOL, sizeof(type2bp_data_t) * UWB_NUM_ANCHOR)) {
         err("Fail to allocate segment of memory handle.\n");
-        ASSERT(0);
+        return -1;
     }
     ptr = reinterpret_cast<char *>(mh.getPa());
 
-    /* Read imu data from driver. */
-    // int ret = poll(fds, 1, 1000);
-    // if (ret < 0) {
-    //     if (errno != EINTR) {
-    //         err("ERROR: poll failed. %d\n", errno);
-    //     }
-    // }
-    // if (ret == 0) {
-    //     err("ERROR: poll timeout.\n");
-    // }
-    // if (fds[0].revents & POLLIN) {
-    //     ret = read(m_fd, ptr, sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
-    //     if (ret != sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO) {
-    //         err("ERROR: read failed. %d\n", errno);
-    //     }
-    // }
+    tcflush(m_fd, TCIFLUSH);
+
+    /* Read uwb data from driver. */
+    while (1) {
+        int ret = poll(fds, 1, 1000);
+        if (ret < 0) {
+            if (errno != EINTR) {
+                err("ERROR: poll failed. errno=%d\n", errno);
+                break;
+            }
+            continue;
+        }
+        if (ret == 0) {
+            err("ERROR: poll timeout.\n");
+            break;
+        }
+        if (fds[0].revents & POLLIN) {
+            uint8_t byte;
+            ssize_t num_bytes = read(m_fd, &byte, 1);
+            if (num_bytes > 0) {
+                buffer[buffer_index++] = byte;
+                if (byte == '\n') {
+                    buffer[buffer_index] = '\0';
+                    // printf("raw : %s\n", ptr);
+                    type2bp_data_t* data_array = reinterpret_cast<type2bp_data_t*>(ptr);
+                    parse_uwb_data(buffer, data_array);
+
+                    this->notify_data(mh);
+                    mh.freeSeg();
+                    return 0;
+                }
+                if (buffer_index >= sizeof(buffer)) {
+                    err("Frame length exceeded maximum allowed size.\n");
+                    buffer_index = 0;
+                }
+            } else if (num_bytes == 0) {
+                continue;
+            } else {
+                if (errno != EAGAIN) {
+                    err("Error reading from UART: %s\n", strerror(errno));
+                    break;
+                }
+            }
+        }
+    }
+    mh.freeSeg();
+    return -1;
+}
+
+
+void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_array) {
     for (auto i = 0; i < UWB_NUM_ANCHOR; i++) {
-        type2bp_data_t *data;
-        data->timestamp = 0;
-        data->anchor_id = i;
-        data->nlos = 0;
-        data->distance  = i * 1.0f;
-        data->azimuth   = i * 1.0f;
-        data->elevation = i * 1.0f;
-        memcpy(ptr + i * sizeof(type2bp_data_t), data, sizeof(type2bp_data_t));
+        data_array[i].timestamp = 0u;
+        data_array[i].anchor_id = -1;
+        data_array[i].nlos      = 0u;
+        data_array[i].distance  = 0.0f;
+        data_array[i].azimuth   = 0.0f;
+        data_array[i].elevation = 0.0f;
     }
 
-    this->notify_data(mh);
-
-    mh.freeSeg();
-    usleep(1 / UWB_SAMPLING_FREQUENCY * 1000 * 1000);
-    return 0;
+    while ((src_data = strstr(src_data, "i")) != NULL) {
+        type2bp_data_t data;
+        data.timestamp = 0;
+        if (sscanf(src_data, "i%ld,n%lu,d%f,a%f,e%f,",
+                   &data.anchor_id, &data.nlos, &data.distance, &data.azimuth, &data.elevation) == 5){
+            if (data.anchor_id >= 0 && data.anchor_id < UWB_NUM_ANCHOR) {
+                data_array[data.anchor_id] = data;
+            }
+        }
+        src_data += 1;
+    }
 }
 
 

@@ -329,40 +329,40 @@ six = ">=1.5"
 
 [[package]]
 name = "pytz"
-version = "2025.1"
+version = "2025.2"
 description = "World timezone definitions, modern and historical"
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "pytz-2025.1-py2.py3-none-any.whl", hash = "sha256:89dd22dca55b46eac6eda23b2d72721bf1bdfef212645d81513ef5d03038de57"},
-    {file = "pytz-2025.1.tar.gz", hash = "sha256:c2db42be2a2518b28e65f9207c4d05e6ff547d1efa4086469ef855e4ab70178e"},
+    {file = "pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00"},
+    {file = "pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3"},
 ]
 
 [[package]]
 name = "rerun-sdk"
-version = "0.19.0"
+version = "0.21.0"
 description = "The Rerun Logging SDK"
 optional = false
-python-versions = "<3.13,>=3.8"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "rerun_sdk-0.19.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:49a48d6d5d7de662ef3e83dc262e65705fa719726f6bc6deefad27c4b6d34e98"},
-    {file = "rerun_sdk-0.19.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:c8012b4e517a911a782472dc97ebbdc6ed4261b44bfdd0e0a0c64496f17ddc91"},
-    {file = "rerun_sdk-0.19.0-cp38-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:65bb8ddf9611827c31d5502f9d1ee997c1facbbdf5dce9a268f0aa6bcaea5439"},
-    {file = "rerun_sdk-0.19.0-cp38-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:6a49fde1c9d0691166402707ec3b317bf0d82fb1b4412b98e02ccbf499d9b92d"},
-    {file = "rerun_sdk-0.19.0-cp38-abi3-win_amd64.whl", hash = "sha256:da304927485cb4e6afe25ea8ed84c0cb7e63f3ba8ce2c72a1034ae1ffc69a6c0"},
+    {file = "rerun_sdk-0.21.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:1e454ceea31c70ae9ec1bb26eaa82828661b7657ab4d2261ca0b94006d6a1975"},
+    {file = "rerun_sdk-0.21.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:84ecb77b0b5bac71b53e849801ff073de89fcd2f1e0ca0da62fb18fcbeceadf0"},
+    {file = "rerun_sdk-0.21.0-cp38-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:919d921165c3238490dbe5bf00a062c68fdd2c54dc14aac6a1914c82edb5d9c8"},
+    {file = "rerun_sdk-0.21.0-cp38-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:897649aadcab7014b78096f93c84c61c00a227b80adaf0dec279924b5aab53d8"},
+    {file = "rerun_sdk-0.21.0-cp38-abi3-win_amd64.whl", hash = "sha256:2060bdb536a198f0f04789ba5ba771e66587e7851d668b3dfab257a5efa16819"},
 ]
 
 [package.dependencies]
 attrs = ">=23.1.0"
-numpy = ">=1.23,<2"
+numpy = ">=1.23"
 pillow = ">=8.0.0"
 pyarrow = ">=14.0.2"
 typing-extensions = ">=4.5"
 
 [package.extras]
-notebook = ["rerun-notebook (==0.19.0)"]
+notebook = ["rerun-notebook (==0.21.0)"]
 tests = ["pytest (==7.1.2)"]
 
 [[package]]
@@ -404,4 +404,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "4bd0c3a4d2035f589d81960d00364b8d4dd45e45eca4bf7b46670c166e61a42b"
+content-hash = "55c32b6ce6c3902bc49d994e7234f20225dbaea5c0bfb5464cb713d9d961729c"

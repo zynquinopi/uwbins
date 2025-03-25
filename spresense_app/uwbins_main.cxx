@@ -132,10 +132,10 @@ static int imu_read_callback(uint32_t ev_type,
     FAR cxd5602pwbimu_data_t *data = NULL;
     data = static_cast<cxd5602pwbimu_data_t *>(mh.getVa());
     for (int i = 0; i < IMU_NUM_FIFO; i++) {
-        printf("ts=%lu,temp=%f,ax=%f,ay=%f,az=%f,gx=%f,gy=%f,gz=%f\n",
-               data[i].timestamp, data[i].temp,
-               data[i].ax, data[i].ay, data[i].az,
-               data[i].gx, data[i].gy, data[i].gz);
+        printf("[imu]ts=%lu, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
+               imu_data[i].timestamp, imu_data[i].temp,
+               imu_data[i].ax, imu_data[i].ay, imu_data[i].az,
+               imu_data[i].gx, imu_data[i].gy, imu_data[i].gz);
     }
     return 0;
 }
@@ -154,12 +154,13 @@ static int uwb_read_callback(uint32_t ev_type,
     packet.mh = mh;
     SS_SendSensorDataMH(&packet);
 
-    FAR UwbSensorClass::type2bp_data_s *data = NULL;
-    data = static_cast<UwbSensorClass::type2bp_data_s *>(mh.getVa());
+    FAR type2bp_data_t *data = NULL;
+    data = static_cast<type2bp_data_t *>(mh.getVa());
     for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
-        printf("ts=%lu,anchor_id=%lu,nlos=%lu,distance=%f,azimuth=%f,elevation=%f\n",
-            data[i].timestamp, data[i].anchor_id,data[i].nlos,
-            data[i].distance, data[i].azimuth, data[i].elevation);
+        printf("[uwb]ts=%lu, i=%ld, n=%lu, d=%6.2f, a=%6.2f, e=%6.2f\n",
+               uwb_data[i].timestamp, uwb_data[i].anchor_id,
+               uwb_data[i].nlos, uwb_data[i].distance,
+               uwb_data[i].azimuth, uwb_data[i].elevation);
     }
     return 0;
 }
