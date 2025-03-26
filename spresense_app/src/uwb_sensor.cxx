@@ -12,7 +12,7 @@
 
 
 #define UWBINS_UWB_DEVNAME "/dev/ttyS2"
-#define UWB_BAUDRATE B115200
+#define UWB_BAUDRATE B2000000
 
 #define err(format, ...)    fprintf(stderr, format, ##__VA_ARGS__)
 
