@@ -118,19 +118,22 @@ static bool sensor_finalize_libraries(void) {
 
 static int imu_read_callback(uint32_t ev_type,
                                uint32_t timestamp,
-                               MemMgrLite::MemHandle &mh) {
-    sensor_command_data_mh_t packet;
-    packet.header.size = 0;
-    packet.header.code = SendData;
-    packet.self = accelID;
-    packet.time = timestamp;
-    packet.fs = IMU_SAMPLING_FREQUENCY;
-    packet.size = IMU_NUM_FIFO;
-    packet.mh = mh;
-    SS_SendSensorDataMH(&packet);
+                               char* data) {
+    // sensor_command_data_mh_t packet;
+    // packet.header.size = 0;
+    // packet.header.code = SendData;
+    // packet.self = accelID;
+    // packet.time = timestamp;
+    // packet.fs = IMU_SAMPLING_FREQUENCY;
+    // packet.size = IMU_NUM_FIFO;
+    // packet.mh = mh;
+    // SS_SendSensorDataMH(&packet);
 
-    FAR cxd5602pwbimu_data_t *data = NULL;
-    data = static_cast<cxd5602pwbimu_data_t *>(mh.getVa());
+
+    // FAR cxd5602pwbimu_data_t *data = NULL;
+    // data = static_cast<cxd5602pwbimu_data_t *>(mh.getVa());
+    FAR cxd5602pwbimu_data_t* imu_data = reinterpret_cast<FAR cxd5602pwbimu_data_t*>(data);
+
     for (int i = 0; i < IMU_NUM_FIFO; i++) {
         printf("[imu]ts=%lu, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
                imu_data[i].timestamp, imu_data[i].temp,
@@ -275,10 +278,10 @@ static void sensor_manager_api_response(unsigned int code,
 extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     sensor_init_libraries();
 
-    if (!SS_ActivateSensorSubSystem(MSGQ_SEN_MGR, sensor_manager_api_response)) {
-        err("Error: SS_ActivateSensorSubSystem() failure.\n");
-        return EXIT_FAILURE;
-    }
+    // if (!SS_ActivateSensorSubSystem(MSGQ_SEN_MGR, sensor_manager_api_response)) {
+    //     err("Error: SS_ActivateSensorSubSystem() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
 
     FAR physical_sensor_t *imu = ImuSensorCreate(imu_read_callback);
     if (imu == NULL) {
@@ -315,13 +318,13 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     /* Resister sensor clients. */
     sensor_command_register_t reg;
 
-    reg.header.size = 0;
-    reg.header.code = ResisterClient;
-    reg.self = accelID;
-    reg.subscriptions = 0;
-    reg.callback = NULL;
-    reg.callback_mh = NULL;
-    SS_SendSensorResister(&reg);
+    // reg.header.size = 0;
+    // reg.header.code = ResisterClient;
+    // reg.self = accelID;
+    // reg.subscriptions = 0;
+    // reg.callback = NULL;
+    // reg.callback_mh = NULL;
+    // SS_SendSensorResister(&reg);
 
     // reg.header.size = 0;
     // reg.header.code = ResisterClient;
@@ -375,15 +378,15 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     //     return EXIT_FAILURE;
     // }
 
-#if defined(CONFIG_CPUFREQ_RELEASE_LOCK) && !defined(CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS)
-    /* After here,
-     * because this example program doesn't access to flash
-     * and doesn't use TCXO,
-     * it turn the flash and TCXO power off to reduce power consumption.
-     */
-    board_xtal_power_control(false);
-    board_flash_power_control(false);
-#endif
+// #if defined(CONFIG_CPUFREQ_RELEASE_LOCK) && !defined(CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS)
+//     /* After here,
+//      * because this example program doesn't access to flash
+//      * and doesn't use TCXO,
+//      * it turn the flash and TCXO power off to reduce power consumption.
+//      */
+//     board_xtal_power_control(false);
+//     board_flash_power_control(false);
+// #endif
 
     message("start sensoring...\n");
 
@@ -392,13 +395,12 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         err("Error: ImuSensorOpen() failure.\n");
         return EXIT_FAILURE;
     }
-    if (ImuSensorStart(imu) < 0) {
-        err("Error: ImuSensorStart() failure.\n");
-        return EXIT_FAILURE;
-    }
-
     if (UwbSensorOpen(uwb) < 0) {
         err("Error: UwbSensorOpen() failure.\n");
+        return EXIT_FAILURE;
+    }
+    if (ImuSensorStart(imu) < 0) {
+        err("Error: ImuSensorStart() failure.\n");
         return EXIT_FAILURE;
     }
     if (UwbSensorStart(uwb) < 0) {
@@ -459,10 +461,10 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     // rel.self = stepcounterID;
     // SS_SendSensorRelease(&rel);
 
-    rel.header.size = 0;
-    rel.header.code = ReleaseClient;
-    rel.self = accelID;
-    SS_SendSensorRelease(&rel);
+    // rel.header.size = 0;
+    // rel.header.code = ReleaseClient;
+    // rel.self = accelID;
+    // SS_SendSensorRelease(&rel);
 
     // rel.header.size = 0;
     // rel.header.code = ReleaseClient;
@@ -481,10 +483,10 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     //     return EXIT_FAILURE;
     // }
 
-    if (!SS_DeactivateSensorSubSystem()) {
-        err("Error: SS_DeactivateSensorSubSystem() failure.\n");
-        return EXIT_FAILURE;
-    }
+    // if (!SS_DeactivateSensorSubSystem()) {
+    //     err("Error: SS_DeactivateSensorSubSystem() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
 
     ImuSensorDestroy(imu);
     UwbSensorDestroy(uwb);

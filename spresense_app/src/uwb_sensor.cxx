@@ -115,17 +115,19 @@ int UwbSensorClass::setup_sensor(FAR void *param) {
 
 
 int UwbSensorClass::read_data() {
-    char buffer[256]; //TDOO : use Memory pool
+    char buffer[512]; //TDOO : use Memory pool
     size_t buffer_index = 0;
-    MemMgrLite::MemHandle mh;
-    FAR char *ptr;
+    // FAR char *ptr;
+    // printf("[CPU : %d/UWB]\n", sched_getcpu());
+    // MemMgrLite::MemHandle mh;
+    // FAR char *ptr;
 
     /* Get segment of memory handle. */
-    if (ERR_OK != mh.allocSeg(S0_UWB_DATA_BUF_POOL, sizeof(type2bp_data_t) * UWB_NUM_ANCHOR)) {
-        err("Fail to allocate segment of memory handle.\n");
-        return -1;
-    }
-    ptr = reinterpret_cast<char *>(mh.getPa());
+    // if (ERR_OK != mh.allocSeg(S0_UWB_DATA_BUF_POOL, sizeof(type2bp_data_t) * UWB_NUM_ANCHOR)) {
+    //     err("Fail to allocate segment of memory handle.\n");
+    //     return -1;
+    // }
+    // ptr = reinterpret_cast<char *>(mh.getPa());
 
     tcflush(m_fd, TCIFLUSH);
 
@@ -144,20 +146,30 @@ int UwbSensorClass::read_data() {
             break;
         }
         if (fds[0].revents & POLLIN) {
-            uint8_t byte;
-            ssize_t num_bytes = read(m_fd, &byte, 1);
+            usleep(3 * 1000);
+            int num_bufers;
+            ioctl(m_fd, FIONREAD, &num_bufers);
+            // uint8_t byte;
+            ssize_t num_bytes = read(m_fd, &buffer, num_bufers);
             if (num_bytes > 0) {
-                buffer[buffer_index++] = byte;
-                if (byte == '\n') {
-                    buffer[buffer_index] = '\0';
+                // buffer[buffer_index++] = byte;
+                // if (byte == '\n') {
+                    buffer[num_bufers] = '\0';
+                    char* ptr = reinterpret_cast<char *>(malloc(sizeof(type2bp_data_t) * UWB_NUM_ANCHOR));
+                    if (!ptr) {
+                        err("Fail to allocate memory.\n");
+                        return -1;
+                    }
                     // printf("raw : %s\n", ptr);
                     type2bp_data_t* data_array = reinterpret_cast<type2bp_data_t*>(ptr);
                     parse_uwb_data(buffer, data_array);
 
-                    this->notify_data(mh);
-                    mh.freeSeg();
+                    // this->notify_data(mh);
+                    m_handler(0, 0, ptr);
+                    // mh.freeSeg();
+                    free(ptr);
                     return 0;
-                }
+                // }
                 if (buffer_index >= sizeof(buffer)) {
                     err("Frame length exceeded maximum allowed size.\n");
                     buffer_index = 0;
@@ -172,7 +184,7 @@ int UwbSensorClass::read_data() {
             }
         }
     }
-    mh.freeSeg();
+    // mh.freeSeg();
     return -1;
 }
 
@@ -201,7 +213,7 @@ void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_a
 }
 
 
-int UwbSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
-    uint32_t timestamp = get_timestamp();
-    return m_handler(0, timestamp, mh);
-};
+// int UwbSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
+//     uint32_t timestamp = get_timestamp();
+//     return m_handler(0, timestamp, mh);
+// };

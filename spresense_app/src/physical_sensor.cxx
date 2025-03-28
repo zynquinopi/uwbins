@@ -14,7 +14,7 @@
 #define TASK_ARG_MAX_DEC_ADDR_SIZE 11
 #define TASK_ARG_NUM                2
 #define TASK_PRIORITY             110
-#define TASK_STACK_SIZE          1024
+#define TASK_STACK_SIZE          1024 * 8
 
 #define err(format, ...) fprintf(stderr, format, ##__VA_ARGS__)
 
@@ -129,6 +129,7 @@ FAR physical_sensor_t *PhysicalSensorCreate(pysical_event_handler_t handler,
     sch_param.sched_priority = TASK_PRIORITY;
     attr.stacksize = TASK_STACK_SIZE;
     pthread_attr_setschedparam(&attr, &sch_param);
+    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
     int ret = pthread_create(&thread_id,
                              &attr,
                              (pthread_startroutine_t)entry_function,

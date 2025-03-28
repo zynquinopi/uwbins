@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <errno.h>
+#include <sched.h>
 #include <nuttx/sensors/cxd5602pwbimu.h>
 
 #include "include/imu_sensor.h"
@@ -119,12 +120,17 @@ int ImuSensorClass::read_data() {
     FAR char *ptr;
 
     /* Get segment of memory handle. */
-    if (ERR_OK != mh.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
-        err("Fail to allocate segment of memory handle.\n");
-        ASSERT(0);
+    // if (ERR_OK != mh.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
+    //     err("Fail to allocate segment of memory handle.\n");
+    //     ASSERT(0);
+    // }
+    // ptr = reinterpret_cast<char *>(mh.getPa());
+    ptr = reinterpret_cast<char *>(malloc(sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO));
+    if (!ptr) {
+        err("Fail to allocate memory.\n");
+        return -1;
     }
-    ptr = reinterpret_cast<char *>(mh.getPa());
-
+    
     /* Read imu data from driver. */
     int ret = poll(fds, 1, 1000);
     if (ret < 0) {
@@ -142,14 +148,16 @@ int ImuSensorClass::read_data() {
         }
     }
 
-    this->notify_data(mh);
+    // this->notify_data(mh);
+    m_handler(0, get_timestamp(), ptr);
 
-    mh.freeSeg();
+    // mh.freeSeg();
+    free(ptr);
     return 0;
 }
 
 
-int ImuSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
-    uint32_t timestamp = get_timestamp();
-    return m_handler(0, timestamp, mh);
-};
+// int ImuSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
+//     uint32_t timestamp = get_timestamp();
+//     return m_handler(0, timestamp, mh);
+// };

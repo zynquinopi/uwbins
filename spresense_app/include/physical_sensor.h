@@ -25,7 +25,7 @@
 
 typedef int (*pysical_event_handler_t)(uint32_t event_id,
                                        uint32_t timestamp,
-                                       MemMgrLite::MemHandle &mh);
+                                       char* data);
 
 struct physical_sensor_s {
     mqd_t mq_request_des;
