@@ -146,21 +146,22 @@ static int imu_read_callback(uint32_t ev_type,
 
 static int uwb_read_callback(uint32_t ev_type,
                              uint32_t timestamp,
-                             MemMgrLite::MemHandle &mh) {
-    sensor_command_data_mh_t packet;
-    packet.header.size = 0;
-    packet.header.code = SendData;
-    packet.self = accelID; //TODO
-    packet.time = timestamp;
-    packet.fs = UWB_SAMPLING_FREQUENCY;
-    packet.size = UWB_NUM_ANCHOR;
-    packet.mh = mh;
-    SS_SendSensorDataMH(&packet);
+                             char* data) {
+    // sensor_command_data_mh_t packet;
+    // packet.header.size = 0;
+    // packet.header.code = SendData;
+    // packet.self = accelID; //TODO
+    // packet.time = timestamp;
+    // packet.fs = UWB_SAMPLING_FREQUENCY;
+    // packet.size = UWB_NUM_ANCHOR;
+    // packet.mh = mh;
+    // SS_SendSensorDataMH(&packet);
 
-    FAR type2bp_data_t *data = NULL;
-    data = static_cast<type2bp_data_t *>(mh.getVa());
+    // FAR type2bp_data_t *data = NULL;
+    // data = static_cast<type2bp_data_t *>(mh.getVa());
+    FAR type2bp_data_t* uwb_data = reinterpret_cast<FAR type2bp_data_t*>(data);
     for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
-        printf("[uwb]ts=%lu, i=%ld, n=%lu, d=%6.2f, a=%6.2f, e=%6.2f\n",
+        printf("[uwb]ts=%lu, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
                uwb_data[i].timestamp, uwb_data[i].anchor_id,
                uwb_data[i].nlos, uwb_data[i].distance,
                uwb_data[i].azimuth, uwb_data[i].elevation);
@@ -316,7 +317,7 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     //  #endif
 
     /* Resister sensor clients. */
-    sensor_command_register_t reg;
+    // sensor_command_register_t reg;
 
     // reg.header.size = 0;
     // reg.header.code = ResisterClient;
@@ -449,7 +450,7 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
 #endif
 
     /* Release sensor clients. */
-    sensor_command_release_t rel;
+    // sensor_command_release_t rel;
 
     // rel.header.size = 0;
     // rel.header.code = ReleaseClient;

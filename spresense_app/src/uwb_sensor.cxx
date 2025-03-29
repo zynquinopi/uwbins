@@ -202,7 +202,7 @@ void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_a
     while ((src_data = strstr(src_data, "i")) != NULL) {
         type2bp_data_t data;
         data.timestamp = 0;
-        if (sscanf(src_data, "i%ld,n%lu,d%f,a%f,e%f,",
+        if (sscanf(src_data, "i%hhd,n%hhu,d%f,a%f,e%f,",
                    &data.anchor_id, &data.nlos, &data.distance, &data.azimuth, &data.elevation) == 5){
             if (data.anchor_id >= 0 && data.anchor_id < UWB_NUM_ANCHOR) {
                 data_array[data.anchor_id] = data;

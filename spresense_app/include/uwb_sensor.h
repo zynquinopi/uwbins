@@ -28,8 +28,8 @@ extern "C"
 
 struct type2bp_data_s {
     uint32_t timestamp;
-    int32_t anchor_id;
-    uint32_t nlos;
+    int8_t anchor_id;
+    uint8_t nlos;
     float distance;   // [cm]
     float azimuth;    // [degree]
     float elevation;  // [degree]
