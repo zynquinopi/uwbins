@@ -191,6 +191,7 @@ int UwbSensorClass::read_data() {
 
 void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_array) {
     for (auto i = 0; i < UWB_NUM_ANCHOR; i++) {
+        data_array[i].type      = DATA_TYPE_UWB;
         data_array[i].timestamp = 0u;
         data_array[i].anchor_id = -1;
         data_array[i].nlos      = 0u;

@@ -1,5 +1,6 @@
+gs2200m SKYBLUE.K102_2.4G MG3TA7bs
+sleep 1.0
 uwbins
-// gs2200m SKYBLUE.K102_2.4G MG3TA7bs
 
 // while true; do
 //     ifconfig wlan0 | grep "inet addr" > /dev/null

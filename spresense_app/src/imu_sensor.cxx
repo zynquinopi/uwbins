@@ -136,6 +136,7 @@ int ImuSensorClass::read_data() {
     // }
     // ptr = reinterpret_cast<char *>(mh.getPa());
     ptr = reinterpret_cast<char *>(malloc(sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO));
+    
     if (!ptr) {
         err("Fail to allocate memory.\n");
         return -1;
@@ -157,9 +158,25 @@ int ImuSensorClass::read_data() {
             err("ERROR: read failed. %d\n", errno);
         }
     }
+    char* out;
+    out = reinterpret_cast<char *>(malloc(sizeof(imu_data_t) * IMU_NUM_FIFO));
+    imu_data_t* out_ = reinterpret_cast<imu_data_t *>(out);
+    cxd5602pwbimu_data_t *in = reinterpret_cast<cxd5602pwbimu_data_t *>(ptr);
+    for (int i = 0; i < IMU_NUM_FIFO; i++) {
+        out_[i].type = DATA_TYPE_IMU;
+        out_[i].data.timestamp = in[i].timestamp;
+        out_[i].data.temp = in[i].temp;
+        out_[i].data.ax = in[i].ax;
+        out_[i].data.ay = in[i].ay;
+        out_[i].data.az = in[i].az;
+        out_[i].data.gx = in[i].gx;
+        out_[i].data.gy = in[i].gy;
+        out_[i].data.gz = in[i].gz;
+    }
+
 
     // this->notify_data(mh);
-    m_handler(0, get_timestamp(), ptr);
+    m_handler(0, get_timestamp(), out);
 
     // mh.freeSeg();
     free(ptr);

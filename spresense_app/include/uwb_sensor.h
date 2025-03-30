@@ -5,6 +5,7 @@
 #include <poll.h>
 
 #include "physical_sensor.h"
+#include "include/types.h"
 
 
 #define UWB_NUM_ANCHOR 4
@@ -27,6 +28,7 @@ extern "C"
 #endif /* __cplusplus */
 
 struct type2bp_data_s {
+    data_type_t type;
     uint32_t timestamp;
     int8_t anchor_id;
     uint8_t nlos;

@@ -3,6 +3,8 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <asmp/mpshm.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
 //  #ifndef CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS
 //  #  include <arch/board/board.h>
@@ -19,7 +21,11 @@
 #include "include/mem_conf/msgq_pool.h"
 #include "include/mem_conf/fixed_fence.h"
 #include <include/MadgwickAHRS.h>
+#include "include/types.h"
 
+
+#define UDP_IP "192.168.11.11"
+#define UDP_PORT 50000
 
 #define CM_2_M 0.01f
 #define SENSOR_SECTION SECTION_NO0
@@ -38,6 +44,9 @@ using namespace MemMgrLite;
 static mpshm_t s_shm;
 static Madgwick madgwick_filter;
 static float last_time = 0.0f;
+
+static int udp_sock;
+static struct sockaddr_in udp_addr;
 
 
 static bool sensor_init_libraries(void) {
@@ -137,20 +146,28 @@ static int imu_read_callback(uint32_t ev_type,
 
     // FAR cxd5602pwbimu_data_t *data = NULL;
     // data = static_cast<cxd5602pwbimu_data_t *>(mh.getVa());
-    FAR cxd5602pwbimu_data_t* imu_data = reinterpret_cast<FAR cxd5602pwbimu_data_t*>(data);
-
+    FAR imu_data_t* imu_data = reinterpret_cast<FAR imu_data_t*>(data);
     for (int i = 0; i < IMU_NUM_FIFO; i++) {
-        printf("[ imu]ts=%f, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
-               imu_data[i].timestamp / 19200000.0f, imu_data[i].temp,
-               imu_data[i].ax, imu_data[i].ay, imu_data[i].az,
-               imu_data[i].gx, imu_data[i].gy, imu_data[i].gz);
-        last_time = imu_data[i].timestamp / 19200000.0f;
-        madgwick_filter.updateIMU(imu_data[i].gx * 180 / 3.14, imu_data[i].gy * 180 / 3.14, imu_data[i].gz * 180 / 3.14,
-                                  imu_data[i].ax / 9.81, imu_data[i].ay / 9.81, imu_data[i].az / 9.81);
-        float q[4];
-        madgwick_filter.getQuaternion(q);
-        printf("[pose]ts=%f, x=0.0,y=0.0, z=0.0, qx=%f, qy=%f, qz=%f, qw=%f\n",
-               imu_data[i].timestamp / 19200000.0f, q[0], q[1], q[2], q[3]);
+        // printf("[ imu]ts=%f, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
+        //        imu_data[i].data.timestamp / 19200000.0f, imu_data[i].data.temp,
+        //        imu_data[i].data.ax, imu_data[i].data.ay, imu_data[i].data.az,
+        //        imu_data[i].data.gx, imu_data[i].data.gy, imu_data[i].data.gz);
+        printf("imu");
+        sendto(udp_sock, &imu_data[i], sizeof(imu_data_t), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        // last_time = imu_data[i].data.timestamp / 19200000.0f;
+        // madgwick_filter.updateIMU(imu_data[i].data.gx * 180 / 3.14, imu_data[i].data.gy * 180 / 3.14, imu_data[i].data.gz * 180 / 3.14,
+        //                           imu_data[i].data.ax / 9.81, imu_data[i].data.ay / 9.81, imu_data[i].data.az / 9.81);
+        // float q[4];
+        // madgwick_filter.getQuaternion(q);
+        // printf("[pose]ts=%f, x=0.0,y=0.0, z=0.0, qx=%f, qy=%f, qz=%f, qw=%f\n",
+        //        imu_data[i].data.timestamp / 19200000.0f, q[0], q[1], q[2], q[3]);
+
+        // pose_data_t pose;
+        // pose.type = DATA_TYPE_POSE;
+        // pose.timestamp = imu_data[i].data.timestamp / 19200000.0f;
+        // pose.x = 0.0f; pose.y = 0.0f; pose.z = 0.0f;
+        // pose.qx = q[0]; pose.qy = q[1]; pose.qz = q[2]; pose.qw = q[3];
+        // sendto(udp_sock, &pose, sizeof(pose_data_t), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr)); 
     }
 
     return 0;
@@ -173,15 +190,16 @@ static int uwb_read_callback(uint32_t ev_type,
     // FAR type2bp_data_t *data = NULL;
     // data = static_cast<type2bp_data_t *>(mh.getVa());
     FAR type2bp_data_t* uwb_data = reinterpret_cast<FAR type2bp_data_t*>(data);
-    for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
-        if (uwb_data[i].anchor_id < 0) {
-            continue;
-        }
-        printf("[ uwb]ts=%lu, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
-               uwb_data[i].timestamp, uwb_data[i].anchor_id,
-               uwb_data[i].nlos, uwb_data[i].distance * CM_2_M,
-               uwb_data[i].azimuth, uwb_data[i].elevation);
-    }
+    // sendto(udp_sock, data, sizeof(type2bp_data_t) * UWB_NUM_ANCHOR, 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+    // for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
+    //     if (uwb_data[i].anchor_id < 0) {
+    //         continue;
+    //     }
+    //     printf("[ uwb]ts=%lu, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
+    //            uwb_data[i].timestamp, uwb_data[i].anchor_id,
+    //            uwb_data[i].nlos, uwb_data[i].distance * CM_2_M,
+    //            uwb_data[i].azimuth, uwb_data[i].elevation);
+    // }
     return 0;
 }
 
@@ -293,6 +311,18 @@ static void sensor_manager_api_response(unsigned int code,
 
 
 extern "C" int uwbins_main(int argc, FAR char *argv[]) {
+
+    udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (udp_sock < 0) {
+        err("Error: socket creation failed");
+        return EXIT_FAILURE;
+    }
+
+    memset(&udp_addr, 0, sizeof(udp_addr));
+    udp_addr.sin_family = AF_INET;
+    udp_addr.sin_port = htons(UDP_PORT);
+    inet_pton(AF_INET, UDP_IP, &udp_addr.sin_addr);
+
     sensor_init_libraries();
 
     madgwick_filter.begin(IMU_SAMPLING_FREQUENCY);
@@ -308,11 +338,11 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    FAR physical_sensor_t *uwb = UwbSensorCreate(uwb_read_callback);
-    if (uwb == NULL) {
-        err("Error: UwbSensorCreate() failure.\n");
-        return EXIT_FAILURE;
-    }
+    // FAR physical_sensor_t *uwb = UwbSensorCreate(uwb_read_callback);
+    // if (uwb == NULL) {
+    //     err("Error: UwbSensorCreate() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
 
     /* Setup GNSS sensor. */
     //  #ifdef CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS
@@ -409,23 +439,23 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
 
     message("start sensoring...\n");
 
-    /* Start physical sensor process. */
+    // /* Start physical sensor process. */
     if (ImuSensorOpen(imu) < 0) {
         err("Error: ImuSensorOpen() failure.\n");
         return EXIT_FAILURE;
     }
-    if (UwbSensorOpen(uwb) < 0) {
-        err("Error: UwbSensorOpen() failure.\n");
-        return EXIT_FAILURE;
-    }
+    // if (UwbSensorOpen(uwb) < 0) {
+    //     err("Error: UwbSensorOpen() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
     if (ImuSensorStart(imu) < 0) {
         err("Error: ImuSensorStart() failure.\n");
         return EXIT_FAILURE;
     }
-    if (UwbSensorStart(uwb) < 0) {
-        err("Error: UwbSensorStart() failure.\n");
-        return EXIT_FAILURE;
-    }
+    // if (UwbSensorStart(uwb) < 0) {
+    //     err("Error: UwbSensorStart() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
 
     //  #ifdef CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS
     //    task_create("gnss_sensoring",
@@ -454,14 +484,14 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (UwbSensorStop(uwb) < 0) {
-        err("Error: UwbSensorStop() failure.\n");
-        return EXIT_FAILURE;
-    }
-    if (UwbSensorClose(uwb) < 0) {
-        err("Error: UwbSensorClose() failure.\n");
-        return EXIT_FAILURE;
-    }
+    // if (UwbSensorStop(uwb) < 0) {
+    //     err("Error: UwbSensorStop() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
+    // if (UwbSensorClose(uwb) < 0) {
+    //     err("Error: UwbSensorClose() failure.\n");
+    //     return EXIT_FAILURE;
+    // }
 
 #ifdef CONFIG_EXAMPLES_STEP_COUNTER_ENABLE_GNSS
     GnssSensorStopSensing(sp_gnss_sensor);
@@ -508,7 +538,8 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     // }
 
     ImuSensorDestroy(imu);
-    UwbSensorDestroy(uwb);
+    // UwbSensorDestroy(uwb);
     sensor_finalize_libraries();
+    close(udp_sock);
     return EXIT_SUCCESS;
 }

@@ -6,12 +6,13 @@
 #include <nuttx/sensors/cxd5602pwbimu.h>
 
 #include "physical_sensor.h"
+#include "include/types.h"
 
 
-#define IMU_SAMPLING_FREQUENCY  480 //15, 30, 60, 120, 240, 480, 960, 1920 [Hz]
+#define IMU_SAMPLING_FREQUENCY   30 //15, 30, 60, 120, 240, 480, 960, 1920 [Hz]
 #define IMU_ACCEL_DRANGE          2 // 2, 4, 8, 16 [g]
 #define IMU_GYRO_DRANGE         500 // 125, 250, 500, 1000, 2000, 4000 [dps]
-#define IMU_NUM_FIFO              4 // 1, 2, 3, 4
+#define IMU_NUM_FIFO              1 // 1, 2, 3, 4
 
 
 #ifdef __cplusplus
@@ -29,6 +30,12 @@ extern "C"
 } /* end of extern "C" */
 #endif /* __cplusplus */
 
+struct imu_data_s {
+    data_type_t type;
+    cxd5602pwbimu_data_t data;
+};
+typedef struct imu_data_s imu_data_t;
+
 #ifdef __cplusplus
 class ImuSensorClass : public PhysicalSensorClass {
 public:
@@ -38,7 +45,7 @@ public:
 
     ~ImuSensorClass() {};
 
-    private:
+private:
     /* Override method */
     int open_sensor();
     int close_sensor();
