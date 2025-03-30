@@ -49,6 +49,7 @@ public:
     /* Local method */
     int read_data();
     int notify_data(MemMgrLite::MemHandle &mh_dst);
+    int read_away_50ms_data();
 
     /* Inline method */
     uint32_t get_timestamp(){ // TODO

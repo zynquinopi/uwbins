@@ -80,7 +80,17 @@ int ImuSensorClass::close_sensor() {
 
 
 int ImuSensorClass::start_sensor() {
-    return ioctl(m_fd, SNIOC_ENABLE, 1);
+    int ret = ioctl(m_fd, SNIOC_ENABLE, 1);
+    if (ret) {
+        err("ERROR: SNIOC_ENABLE failed. %d\n", ret);
+        return -1;
+    }
+    ret = read_away_50ms_data();
+    if (ret) {
+        err("ERROR: read_away_50ms_data failed.\n");
+        return -1;
+    }
+    return ret;
 }
 
 
@@ -161,3 +171,18 @@ int ImuSensorClass::read_data() {
 //     uint32_t timestamp = get_timestamp();
 //     return m_handler(0, timestamp, mh);
 // };
+
+
+int ImuSensorClass::read_away_50ms_data() {
+    int cnt = IMU_SAMPLING_FREQUENCY / 20 * 3; /* data size of 50ms */
+    cnt = ((cnt + IMU_NUM_FIFO - 1) / IMU_NUM_FIFO) * IMU_NUM_FIFO;
+    if (cnt == 0) cnt = IMU_NUM_FIFO;
+
+    cxd5602pwbimu_data_t tmp_data[IMU_NUM_FIFO];
+    while (cnt) {
+        read(m_fd, tmp_data, sizeof(tmp_data[0]) * IMU_NUM_FIFO);
+        cnt -= IMU_NUM_FIFO;
+    }
+
+    return 0;
+}
