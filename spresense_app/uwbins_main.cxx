@@ -18,7 +18,10 @@
 #include "include/mem_conf/pool_layout.h"
 #include "include/mem_conf/msgq_pool.h"
 #include "include/mem_conf/fixed_fence.h"
+#include <include/MadgwickAHRS.h>
 
+
+#define CM_2_M 0.01f
 #define SENSOR_SECTION SECTION_NO0
 
 using namespace MemMgrLite;
@@ -33,6 +36,8 @@ using namespace MemMgrLite;
 //  #endif
 // static FAR StepCounterClass *sp_step_counter_ins = NULL;
 static mpshm_t s_shm;
+static Madgwick madgwick_filter;
+static float last_time = 0.0f;
 
 
 static bool sensor_init_libraries(void) {
@@ -135,11 +140,19 @@ static int imu_read_callback(uint32_t ev_type,
     FAR cxd5602pwbimu_data_t* imu_data = reinterpret_cast<FAR cxd5602pwbimu_data_t*>(data);
 
     for (int i = 0; i < IMU_NUM_FIFO; i++) {
-        printf("[imu]ts=%lu, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
-               imu_data[i].timestamp, imu_data[i].temp,
+        printf("[ imu]ts=%f, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
+               imu_data[i].timestamp / 19200000.0f, imu_data[i].temp,
                imu_data[i].ax, imu_data[i].ay, imu_data[i].az,
                imu_data[i].gx, imu_data[i].gy, imu_data[i].gz);
+        last_time = imu_data[i].timestamp / 19200000.0f;
+        madgwick_filter.updateIMU(imu_data[i].gx * 180 / 3.14, imu_data[i].gy * 180 / 3.14, imu_data[i].gz * 180 / 3.14,
+                                  imu_data[i].ax / 9.81, imu_data[i].ay / 9.81, imu_data[i].az / 9.81);
+        float q[4];
+        madgwick_filter.getQuaternion(q);
+        printf("[pose]ts=%f, x=0.0,y=0.0, z=0.0, qx=%f, qy=%f, qz=%f, qw=%f\n",
+               imu_data[i].timestamp / 19200000.0f, q[0], q[1], q[2], q[3]);
     }
+
     return 0;
 }
 
@@ -161,9 +174,12 @@ static int uwb_read_callback(uint32_t ev_type,
     // data = static_cast<type2bp_data_t *>(mh.getVa());
     FAR type2bp_data_t* uwb_data = reinterpret_cast<FAR type2bp_data_t*>(data);
     for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
-        printf("[uwb]ts=%lu, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
+        if (uwb_data[i].anchor_id < 0) {
+            continue;
+        }
+        printf("[ uwb]ts=%lu, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
                uwb_data[i].timestamp, uwb_data[i].anchor_id,
-               uwb_data[i].nlos, uwb_data[i].distance,
+               uwb_data[i].nlos, uwb_data[i].distance * CM_2_M,
                uwb_data[i].azimuth, uwb_data[i].elevation);
     }
     return 0;
@@ -278,6 +294,8 @@ static void sensor_manager_api_response(unsigned int code,
 
 extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     sensor_init_libraries();
+
+    madgwick_filter.begin(IMU_SAMPLING_FREQUENCY);
 
     // if (!SS_ActivateSensorSubSystem(MSGQ_SEN_MGR, sensor_manager_api_response)) {
     //     err("Error: SS_ActivateSensorSubSystem() failure.\n");
