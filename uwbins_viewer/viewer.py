@@ -4,7 +4,7 @@ import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
 
-from utils import *
+from .utils import *
 
 
 F = 500
@@ -27,6 +27,8 @@ UwbAnchorColor = [
     (0, 0, 255),
     (255, 255, 0)
 ]
+
+UwbAnchorBoxSize = np.array([0.05, 0.001, 0.1])
 
 
 class UwbInsViewer:
@@ -58,68 +60,63 @@ class UwbInsViewer:
 
     def setup_static_components(self) -> None:
         rr.log("/3d", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)
-        rr.log(
-            "3d/xyz",
-            rr.Arrows3D(
-                vectors=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                colors=[AxisColor.X.value, AxisColor.Y.value, AxisColor.Z.value],
-            ),
-            static=True
-        )
+        rr.log("3d/xyz",
+               rr.Arrows3D(
+                   vectors=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                   colors=[AxisColor.X.value, AxisColor.Y.value, AxisColor.Z.value],
+               ),
+               static=True)
         rr.log("/3d/frustum", rr.Pinhole(image_from_camera=M, resolution=[W, H]), static=True)
 
         for axis, color in zip("xyz", AxisColor):
             rr.log(f"/sensor/acc/{axis}", rr.SeriesLine(color=color.value), static=True)
             rr.log(f"/sensor/gyro/{axis}", rr.SeriesLine(color=color.value), static=True)
 
-        for anchor_id, color in zip(range(4), UwbAnchorColor): #TODO: hard coded 4
+        for anchor_id, color in zip(range(len(self.anchor_poses)), UwbAnchorColor):
             rr.log(
                 f"/3d/uwb/box/{anchor_id}",
                 rr.Boxes3D(
                     centers=self.anchor_poses[anchor_id].position,
-                    half_sizes=np.tile([0.05, 0.001, 0.1], (4, 1)),
+                    half_sizes=np.tile(UwbAnchorBoxSize, (4, 1)),
                     quaternions=[rr.Quaternion.identity(), rr.Quaternion(xyzw=self.anchor_poses[anchor_id].rotation)],
                     colors=color,
                 ),
                 static=True
             )
             rr.log(f"/sensor/uwb/distance/{anchor_id}", rr.SeriesLine(color=color), static=True)
-            rr.log(f"/sensor/uwb/azimuth/{anchor_id}", rr.SeriesLine(color=color), static=True)
-            rr.log(f"/sensor/uwb/elevation/{anchor_id}", rr.SeriesLine(color=color), static=True)
+            # rr.log(f"/sensor/uwb/azimuth/{anchor_id}", rr.SeriesLine(color=color), static=True)
+            # rr.log(f"/sensor/uwb/elevation/{anchor_id}", rr.SeriesLine(color=color), static=True)
 
-
-    def draw_data(self, data_type: str, data: dict) -> None:
-        if data_type == "imu":
-            imu_data = Imu(float(data["ts"]),
-                           float(data["t"]),
+    def draw_data(self, data_type: DataType, data: dict) -> None:
+        if data_type == DataType.IMU:
+            imu_data = Imu(float(data["timestamp"]),
+                           float(data["temperature"]),
                            np.array([float(data["ax"]), float(data["ay"]), float(data["az"])]),
                            np.array([float(data["gx"]), float(data["gy"]), float(data["gz"])])
             )
             self._draw_imu(imu_data)
 
-        elif data_type == "uwb":
-            uwb_data = Uwb(float(data["ts"]),
-                           int(data["i"]),
-                           int(data["n"]),
-                           float(data["d"]),
-                           float(data["a"]),
-                           float(data["e"])
+        elif data_type == DataType.UWB:
+            uwb_data = Uwb(float(data["timestamp"]),
+                           int(data["anchor_id"]),
+                           int(data["nlos"]),
+                           float(data["distance"]),
+                           float(data["azimuth"]),
+                           float(data["elevation"])
             )
             self._draw_uwb(uwb_data)
 
-        elif data_type == "pose":
+        elif data_type == DataType.POSE:
             pose = Pose(
                 position = np.array([0.0, 0.0, 0.0]),
                 rotation=np.array([float(data["qx"]), float(data["qy"]), float(data["qz"]), float(data["qw"])]),
             )
             self._draw_pose(pose)
 
-
     def _draw_imu(self, imu: Imu) -> None:
         for axis, acc, gyro in zip("xyz", imu.acc, imu.gyro):
             rr.log(f"/sensor/acc/{axis}", rr.Scalar(acc))
             rr.log(f"/sensor/gyro/{axis}", rr.Scalar(gyro))
-
 
     def _draw_uwb(self, uwb: Uwb) -> None:
         rr.log(f"/sensor/uwb/distance/{uwb.anchor_id}", rr.Scalar(uwb.distance))
@@ -135,7 +132,6 @@ class UwbInsViewer:
                 line_radii=0.002,
             )
         )
-
 
     def _draw_pose(self, pose: Pose) -> None:
         rr.log(

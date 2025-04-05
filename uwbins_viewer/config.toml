@@ -1,30 +1,30 @@
 [receiver]
-interface = "serial"
+interface = "socket" # serial or socket
 
 [receiver.serial]
 device = "/dev/ttyUSB0"
 baudrate = 460800
 
 [receiver.socket]
-ip = "192.168.0.100"
-port = 8001
+ip = "192.168.11.11"
+port = 50000
 
 [uwb.anchor0]
 id = 0
-position = [1.0, 1.0, 0.0]
+position = [1.69, 0.0, 2.03]
 rotation = [0.0, 0.0, 0.0, 1.0]
 
 [uwb.anchor1]
 id = 1
-position = [1.0, 1.0, 1.0]
+position = [1.69, 0.0, 0.0]
 rotation = [0.0, 0.0, 0.0, 1.0]
 
 [uwb.anchor2]
 id = 2
-position = [-1.0, 1.0, 0.0]
+position = [0.0, 0.0, 0.0]
 rotation = [0.0, 0.0, 0.0, 1.0]
 
 [uwb.anchor3]
 id = 3
-position = [-1.0, 1.0, 1.0]
+position = [0.0, 0.0, 2.03]
 rotation = [0.0, 0.0, 0.0, 1.0]

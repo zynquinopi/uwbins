@@ -9,37 +9,26 @@
 #include "include/types.h"
 
 
-#define IMU_SAMPLING_FREQUENCY   30 //15, 30, 60, 120, 240, 480, 960, 1920 [Hz]
+#define IMU_SAMPLING_FREQUENCY   120 //15, 30, 60, 120, 240, 480, 960, 1920 [Hz]
 #define IMU_ACCEL_DRANGE          2 // 2, 4, 8, 16 [g]
 #define IMU_GYRO_DRANGE         500 // 125, 250, 500, 1000, 2000, 4000 [dps]
-#define IMU_NUM_FIFO              1 // 1, 2, 3, 4
+#define IMU_NUM_FIFO              4 // 1, 2, 3, 4
 
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif /* __cplusplus */
-    FAR physical_sensor_t *ImuSensorCreate(pysical_event_handler_t handler);
-    int ImuSensorOpen(FAR physical_sensor_t *sensor);
-    int ImuSensorStart(FAR physical_sensor_t *sensor);
-    int ImuSensorStop(FAR physical_sensor_t *sensor);
-    int ImuSensorClose(FAR physical_sensor_t *sensor);
-    int ImuSensorDestroy(FAR physical_sensor_t *sensor);
+extern "C" {
+    physical_sensor_t *ImuSensorCreate(pysical_event_handler_t handler);
+    int ImuSensorOpen(physical_sensor_t *sensor);
+    int ImuSensorStart(physical_sensor_t *sensor);
+    int ImuSensorStop(physical_sensor_t *sensor);
+    int ImuSensorClose(physical_sensor_t *sensor);
+    int ImuSensorDestroy(physical_sensor_t *sensor);
 
-#ifdef __cplusplus
 } /* end of extern "C" */
-#endif /* __cplusplus */
 
-struct imu_data_s {
-    data_type_t type;
-    cxd5602pwbimu_data_t data;
-};
-typedef struct imu_data_s imu_data_t;
 
-#ifdef __cplusplus
 class ImuSensorClass : public PhysicalSensorClass {
 public:
-    ImuSensorClass(FAR physical_sensor_t *sensor) : PhysicalSensorClass(sensor) {
+    ImuSensorClass(physical_sensor_t *sensor) : PhysicalSensorClass(sensor) {
         create();
     };
 
@@ -51,11 +40,10 @@ private:
     int close_sensor();
     int start_sensor();
     int stop_sensor();
-    int setup_sensor(FAR void *param);
+    int setup_sensor(void *param);
 
     /* Local method */
     int read_data();
-    int notify_data(MemMgrLite::MemHandle &mh_dst);
     int read_away_50ms_data();
 
     /* Inline method */
@@ -69,5 +57,4 @@ private:
   struct pollfd fds[1];
 };
 
-#endif /* __cplusplus */
 #endif /* _EXAMPLES_UWBINS_IMU_SENSOR_H */

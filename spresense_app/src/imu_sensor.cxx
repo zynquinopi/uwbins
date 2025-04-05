@@ -7,6 +7,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <sched.h>
+#include <memory>
 #include <nuttx/sensors/cxd5602pwbimu.h>
 
 #include "include/imu_sensor.h"
@@ -126,21 +127,8 @@ int ImuSensorClass::setup_sensor(FAR void *param) {
 
 
 int ImuSensorClass::read_data() {
-    MemMgrLite::MemHandle mh;
-    FAR char *ptr;
-
-    /* Get segment of memory handle. */
-    // if (ERR_OK != mh.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
-    //     err("Fail to allocate segment of memory handle.\n");
-    //     ASSERT(0);
-    // }
-    // ptr = reinterpret_cast<char *>(mh.getPa());
-    ptr = reinterpret_cast<char *>(malloc(sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO));
-    
-    if (!ptr) {
-        err("Fail to allocate memory.\n");
-        return -1;
-    }
+    std::unique_ptr<Packet[]> out(new Packet[IMU_NUM_FIFO]);
+    std::unique_ptr<char[]> ptr(new char[sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO]);
     
     /* Read imu data from driver. */
     int ret = poll(fds, 1, 1000);
@@ -153,41 +141,22 @@ int ImuSensorClass::read_data() {
         err("ERROR: poll timeout.\n");
     }
     if (fds[0].revents & POLLIN) {
-        ret = read(m_fd, ptr, sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
+        ret = read(m_fd, ptr.get(), sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
         if (ret != sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO) {
             err("ERROR: read failed. %d\n", errno);
         }
     }
-    char* out;
-    out = reinterpret_cast<char *>(malloc(sizeof(imu_data_t) * IMU_NUM_FIFO));
-    imu_data_t* out_ = reinterpret_cast<imu_data_t *>(out);
-    cxd5602pwbimu_data_t *in = reinterpret_cast<cxd5602pwbimu_data_t *>(ptr);
-    for (int i = 0; i < IMU_NUM_FIFO; i++) {
-        out_[i].type = DATA_TYPE_IMU;
-        out_[i].data.timestamp = in[i].timestamp;
-        out_[i].data.temp = in[i].temp;
-        out_[i].data.ax = in[i].ax;
-        out_[i].data.ay = in[i].ay;
-        out_[i].data.az = in[i].az;
-        out_[i].data.gx = in[i].gx;
-        out_[i].data.gy = in[i].gy;
-        out_[i].data.gz = in[i].gz;
+    cxd5602pwbimu_data_t* imu_raw = reinterpret_cast<cxd5602pwbimu_data_t *>(ptr.get());
+    uint64_t base_timestamp = ((uint64_t)imu_raw[3].timestamp * 1000000ULL) / 19200000ULL;
+    for (auto i = IMU_NUM_FIFO - 1; i >= 0; i--) {
+        out[i].type = PacketType::IMU;
+        uint64_t tmp_timestamp = ((uint64_t)imu_raw[i].timestamp * 1000000ULL) / 19200000ULL;
+        out[i].timestamp = get_us_timestamp() - (base_timestamp - tmp_timestamp);
+        memcpy(&out[i].imu, &imu_raw[i], sizeof(cxd5602pwbimu_data_t));
     }
-
-
-    // this->notify_data(mh);
-    m_handler(0, get_timestamp(), out);
-
-    // mh.freeSeg();
-    free(ptr);
+    m_handler(0, get_timestamp(), reinterpret_cast<char *>(out.get()));
     return 0;
 }
-
-
-// int ImuSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
-//     uint32_t timestamp = get_timestamp();
-//     return m_handler(0, timestamp, mh);
-// };
 
 
 int ImuSensorClass::read_away_50ms_data() {

@@ -1,5 +1,8 @@
 from dataclasses import dataclass
+from enum import Enum
+
 import numpy as np
+
 
 @dataclass
 class Imu:
@@ -29,3 +32,9 @@ class AnchorPose:
     id: int
     position: np.ndarray
     rotation: np.ndarray
+
+class DataType(Enum):
+    IMU = 0
+    UWB = 1
+    POSE = 2
+    UNKNOWN = 255

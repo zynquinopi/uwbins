@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from runner import online
+from .runner import online
 
 
 def create_parser() -> argparse.ArgumentParser:

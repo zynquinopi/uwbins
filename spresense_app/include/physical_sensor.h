@@ -156,6 +156,12 @@ private:
 
 protected:
     pysical_event_handler_t m_handler;
+
+    uint64_t get_us_timestamp(void) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return (uint64_t)(ts.tv_sec) * 1000000 + ts.tv_nsec / 1000;
+    }
 };
 
 #endif /* __cplusplus */

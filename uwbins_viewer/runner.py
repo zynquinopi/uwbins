@@ -3,9 +3,9 @@ import argparse
 import toml
 import numpy as np
 
-from viewer import UwbInsViewer
-from receiver import UdpReceiver, SerialReceiver
-from utils import *
+from .viewer import UwbInsViewer
+from .receiver import UdpReceiver, SerialReceiver
+from .utils import *
 
 
 def load_anchor_poses(toml_args) -> list[AnchorPose]:
