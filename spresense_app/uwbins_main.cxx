@@ -5,12 +5,14 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <memory>
+#include <iostream>
 
 #include "include/imu_sensor.h"
 #include "include/uwb_sensor.h"
 #include "sensing/sensor_ecode.h"
 #include "include/types.h"
 #include "include/MadgwickAHRS.h"
+#include "include/file_logger.h"
 
 
 #define UDP_IP "192.168.11.11"
@@ -38,6 +40,14 @@ static int imu_read_callback(uint32_t ev_type,
         //        imu_data[i].data.ax, imu_data[i].data.ay, imu_data[i].data.az,
         //        imu_data[i].data.gx, imu_data[i].data.gy, imu_data[i].data.gz);
         sendto(udp_sock, &imu_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        imu_file << imu_packet[i].timestamp << ","
+                 << imu_packet[i].imu.temp << ","
+                 << imu_packet[i].imu.ax << ","
+                 << imu_packet[i].imu.ay << ","
+                 << imu_packet[i].imu.az << ","
+                 << imu_packet[i].imu.gx << ","
+                 << imu_packet[i].imu.gy << ","
+                 << imu_packet[i].imu.gz << std::endl;
 
         madgwick_filter.updateIMU(imu_packet[i].imu.gx, imu_packet[i].imu.gy, imu_packet[i].imu.gz,
                                   imu_packet[i].imu.ax, imu_packet[i].imu.ay, imu_packet[i].imu.az);
@@ -65,6 +75,12 @@ static int uwb_read_callback(uint32_t ev_type,
             continue;
         }
         sendto(udp_sock, &packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        uwb_file << packet[i].timestamp << ","
+                 << static_cast<int>(packet[i].uwb.anchor_id) << ","
+                 << static_cast<int>(packet[i].uwb.nlos) << ","
+                 << packet[i].uwb.distance << ","
+                 << packet[i].uwb.azimuth << ","
+                 << packet[i].uwb.elevation << std::endl;
         // printf("[ uwb]ts=%f, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
         //        packet[i].timestamp, packet[i].uwb.anchor_id,
         //        packet[i].uwb.nlos, packet[i].uwb.distance,
@@ -75,6 +91,10 @@ static int uwb_read_callback(uint32_t ev_type,
 
 
 extern "C" int uwbins_main(int argc, FAR char *argv[]) {
+    if (!init_log_files()) {
+        err("Error: open_sensor_logs() failure.\n");
+        return EXIT_FAILURE;
+    }
 
     udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_sock < 0) {
@@ -150,6 +170,9 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         return EXIT_FAILURE;
     }
     printf("UwbSensorClose() success.\n");
+
+    imu_file.close();
+    uwb_file.close();
 
     ImuSensorDestroy(imu);
     printf("ImuSensorDestroy() success.\n");

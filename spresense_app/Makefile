@@ -15,6 +15,7 @@ CXXSRCS = \
 	src/imu_sensor.cxx \
 	src/uwb_sensor.cxx \
 	src/MadgwickAHRS.cxx \
+	src/file_logger.cxx \
 # gnss_sensor.cxx
 
 CXXFLAGS += -D_POSIX
