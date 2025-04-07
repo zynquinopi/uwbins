@@ -3,6 +3,7 @@ from enum import Enum
 import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
+from scipy.optimize import least_squares
 
 from .utils import *
 
@@ -31,9 +32,19 @@ UwbAnchorColor = [
 UwbAnchorBoxSize = np.array([0.05, 0.001, 0.1])
 
 
+def trilateration(anchor_positions, distances, initial_guess=None):
+    def residuals(pos):
+        return np.linalg.norm(anchor_positions - pos, axis=1) - distances
+
+    result = least_squares(residuals, initial_guess)
+    return result.x
+
+
 class UwbInsViewer:
     def __init__(self, anchor_poses: list[AnchorPose]) -> None:
         self.anchor_poses = np.array(anchor_poses)
+        self.distances = np.array([0.0, 0.0, 0.0, 0.0])
+        self.latest_position = np.array([0.845, 0.0, 1.015])
 
         rr.init("UWBINS rerun viewer")
         rr.serve_web()
@@ -104,11 +115,17 @@ class UwbInsViewer:
                            float(data["azimuth"]),
                            float(data["elevation"])
             )
+            self.distances[data["anchor_id"]] = float(data["distance"])
+            if data["anchor_id"] == 3:
+                poses = np.array([self.anchor_poses[i].position for i in range(len(self.anchor_poses))])
+                position = trilateration(poses, self.distances, self.latest_position)
+                self.latest_position = position
             self._draw_uwb(uwb_data)
 
         elif data_type == DataType.POSE:
             pose = Pose(
-                position = np.array([0.0, 0.0, 0.0]),
+                # position = np.array([0.0, 0.0, 0.0]),
+                position = np.array(self.latest_position),
                 rotation=np.array([float(data["qx"]), float(data["qy"]), float(data["qz"]), float(data["qw"])]),
             )
             self._draw_pose(pose)

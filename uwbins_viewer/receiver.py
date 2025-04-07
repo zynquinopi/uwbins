@@ -10,7 +10,8 @@ import socket
 from .utils import DataType
 
 
-PACKET_HEADER_FORMAT = "If"   # type + timestamp
+PACKET_HEADER_FORMAT = "i4xQ"   # type + timestamp
+PACKET_HEADER_SIZE = struct.calcsize(PACKET_HEADER_FORMAT)
 IMU_DATA_FORMAT = "I f f f f f f f"  # timestamp, temp, gx, gy, gz, ax, ay, az
 IMU_PACKET_FORMAT = PACKET_HEADER_FORMAT + IMU_DATA_FORMAT
 IMU_PACKET_SIZE = struct.calcsize(IMU_PACKET_FORMAT)
@@ -135,7 +136,7 @@ class UdpReceiver(Receiver):
         if len(data) < struct.calcsize(PACKET_HEADER_FORMAT):
             print(f"Invalid packet size : {len(data)}")
             return None
-        data_type_int, timestamp = struct.unpack(PACKET_HEADER_FORMAT, data[:8])
+        data_type_int, timestamp = struct.unpack(PACKET_HEADER_FORMAT, data[:PACKET_HEADER_SIZE])
         data_type = DataType(data_type_int)
         if data_type == DataType.IMU:
             imu_values = struct.unpack(IMU_PACKET_FORMAT, data[:IMU_PACKET_SIZE])

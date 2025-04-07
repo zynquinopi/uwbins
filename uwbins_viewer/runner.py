@@ -37,4 +37,4 @@ def online(args: argparse.Namespace) -> None:
         receiver = UdpReceiver(socket_config["ip"], socket_config["port"], viewer=viewer)
     receiver.open()
     receiver.start()
-    input("Press Enter⏎ to stop sending dummy data:\n")
+    input("Press Enter⏎ to stop viewer\n")
