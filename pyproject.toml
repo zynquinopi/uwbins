@@ -11,6 +11,7 @@ pandas = "^2.2.3"
 numpy = "1.26.2"
 pyserial = "^3.5"
 toml = "^0.10.2"
+matplotlib = "^3.10.1"
 
 [build-system]
 requires = ["poetry-core"]
