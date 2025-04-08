@@ -665,16 +665,16 @@ files = [
 
 [[package]]
 name = "rerun-sdk"
-version = "0.21.0"
+version = "0.22.1"
 description = "The Rerun Logging SDK"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "rerun_sdk-0.21.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:1e454ceea31c70ae9ec1bb26eaa82828661b7657ab4d2261ca0b94006d6a1975"},
-    {file = "rerun_sdk-0.21.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:84ecb77b0b5bac71b53e849801ff073de89fcd2f1e0ca0da62fb18fcbeceadf0"},
-    {file = "rerun_sdk-0.21.0-cp38-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:919d921165c3238490dbe5bf00a062c68fdd2c54dc14aac6a1914c82edb5d9c8"},
-    {file = "rerun_sdk-0.21.0-cp38-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:897649aadcab7014b78096f93c84c61c00a227b80adaf0dec279924b5aab53d8"},
-    {file = "rerun_sdk-0.21.0-cp38-abi3-win_amd64.whl", hash = "sha256:2060bdb536a198f0f04789ba5ba771e66587e7851d668b3dfab257a5efa16819"},
+    {file = "rerun_sdk-0.22.1-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:176853d14bcac0b3cab8b240fe6760e32a577b1edd9ecb2fd0656e83f046a2c4"},
+    {file = "rerun_sdk-0.22.1-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:dea4a50c916bc82bd97a8f9dc44c71f9a9fccec7e73f37edfaa0de800caf5dce"},
+    {file = "rerun_sdk-0.22.1-cp38-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:29d807909f5e484aa6427d9fb25706d0a154de392a4ca47eb303fbd135c0e382"},
+    {file = "rerun_sdk-0.22.1-cp38-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:b9672412d0cdf57c79c10ca683e59716399da3358df78b985b25093d022ebbaf"},
+    {file = "rerun_sdk-0.22.1-cp38-abi3-win_amd64.whl", hash = "sha256:d3d0afe1b8e749a1088a0bb75f372ad7fe70eb3728bd32e07bf78300436a053d"},
 ]
 
 [package.dependencies]
@@ -685,7 +685,7 @@ pyarrow = ">=14.0.2"
 typing-extensions = ">=4.5"
 
 [package.extras]
-notebook = ["rerun-notebook (==0.21.0)"]
+notebook = ["rerun-notebook (==0.22.1)"]
 tests = ["pytest (==7.1.2)"]
 
 [[package]]
@@ -795,7 +795,25 @@ files = [
     {file = "tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9"},
 ]
 
+[[package]]
+name = "ukfm"
+version = "1.0.0"
+description = "Unscented Kalman Filtering on (Parallelizable) Manifolds in Python"
+optional = false
+python-versions = "*"
+files = []
+develop = true
+
+[package.dependencies]
+matplotlib = "*"
+numpy = "*"
+scipy = "*"
+
+[package.source]
+type = "directory"
+url = "external/ukfm/python"
+
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "c6722dcafe522a7f83bfda887fdef80b34f715f449af022fb7353ff34aac2a94"
+content-hash = "1245b5541a4d9044d5dd75b6d48c7694689cec799a001d0997cfca1788fe5e20"

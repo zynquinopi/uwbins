@@ -124,6 +124,7 @@ class UwbInsViewer:
 
         elif data_type == DataType.POSE:
             pose = Pose(
+                float(data["timestamp"]),
                 # position = np.array([0.0, 0.0, 0.0]),
                 position = np.array(self.latest_position),
                 rotation=np.array([float(data["qx"]), float(data["qy"]), float(data["qz"]), float(data["qw"])]),
@@ -154,4 +155,86 @@ class UwbInsViewer:
         rr.log(
             "/3d/frustum",
             rr.Transform3D(translation=pose.position, rotation=rr.Quaternion(xyzw=pose.rotation)),
+        )
+
+
+    def draw_data_batch(self, data_type: DataType, data: list[Imu | Uwb]) -> None:
+        if data_type == DataType.IMU:
+            self._draw_imu_batch(np.array(data))
+
+        elif data_type == DataType.UWB:
+            self._draw_uwb_batch(np.array(data))
+        #     # if uwbs[0].anchor_id == 3:
+        #     #     poses = np.array([self.anchor_poses[i].position for i in range(len(self.anchor_poses))])
+        #     #     position = trilateration(poses, self.distances, self.latest_position)
+        #     #     self.latest_position = position
+        #     self._draw_uwb_batch(np.array(uwbs))
+
+        elif data_type == DataType.POSE:
+            self.draw_pose(np.array(data))
+
+
+    def _draw_imu_batch(self, imus: np.ndarray) -> None:
+        timestamps = np.array([imu.timestamp for imu in imus])
+        accs = np.stack([imu.acc for imu in imus], axis=0)
+        gyros = np.stack([imu.gyro for imu in imus], axis=0)
+        for i, axis in enumerate("xyz"):
+            rr.send_columns(
+                f"/sensor/acc/{axis}",
+                indexes=[rr.TimeSecondsColumn("time", timestamps)],
+                columns=rr.Scalar.columns(scalar=accs[:, i]),
+            )
+            rr.send_columns(
+                f"/sensor/gyro/{axis}",
+                indexes=[rr.TimeSecondsColumn("time", timestamps)],
+                columns=rr.Scalar.columns(scalar=gyros[:, i]),
+            )
+
+
+    def _draw_uwb_batch(self, uwbs: np.ndarray) -> None:
+        anchor_ids = set(uwb.anchor_id for uwb in uwbs)
+        for id in anchor_ids:
+            timestamps = np.array([uwb.timestamp for uwb in uwbs if uwb.anchor_id == id])
+            distances = np.array([uwb.distance for uwb in uwbs if uwb.anchor_id == id])
+            # azimuths = np.array([uwb.azimuth for uwb in uwbs if uwb.anchor_id == id])
+            # elevations = np.array([uwb.elevation for uwb in uwbs if uwb.anchor_id == id])
+            rr.send_columns(
+                f"/sensor/uwb/distance/{id}",
+                indexes=[rr.TimeSecondsColumn("time", timestamps)],
+                columns=rr.Scalar.columns(scalar=distances),
+            )
+            # rr.send_columns(
+            #     f"/sensor/uwb/azimuth/{id}",
+            #     indexes=[rr.TimeSecondsColumn("time", timestamps)],
+            #     columns=rr.Scalar.columns(scalar=azimuths),
+            # )
+            # rr.send_columns(
+            #     f"/sensor/uwb/elevation/{id}",
+            #     indexes=[rr.TimeSecondsColumn("time", timestamps)],
+            #     columns=rr.Scalar.columns(scalar=elevations),
+            # )
+            rr.send_columns(
+                f"/3d/uwb/{id}",
+                indexes=[rr.TimeSecondsColumn("time", timestamps)],
+                columns=rr.Ellipsoids3D.columns(
+                    centers=[self.anchor_poses[id].position] * len(timestamps),
+                    half_sizes=np.array([distances, distances, distances]).T,
+                    colors=[UwbAnchorColor[id]] * len(timestamps),
+                    fill_mode=[rr.components.FillMode.DenseWireframe] * len(timestamps),
+                    line_radii=[0.002] * len(timestamps),
+                ),
+            )
+
+
+    def draw_pose(self, poses: np.ndarray) -> None:
+        timestamps = np.array([pose.timestamp for pose in poses])
+        positions = np.array([pose.position for pose in poses])
+        rotations = np.array([pose.rotation for pose in poses])
+        rr.send_columns(
+            "/3d/frustum",
+            indexes=[rr.TimeSecondsColumn("time", timestamps)],
+            columns=rr.Transform3D.columns(
+                translation=positions,
+                quaternion=[rr.Quaternion(xyzw=rot) for rot in rotations],
+            ),
         )

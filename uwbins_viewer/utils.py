@@ -24,6 +24,7 @@ class Uwb:
 
 @dataclass
 class Pose:
+    timestamp: float
     position: np.ndarray
     rotation: np.ndarray
 

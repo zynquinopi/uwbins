@@ -3,68 +3,39 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plot_histogram(df):
-    # タイムスタンプの差分を計算
-    df['timestamp_diff'] = df['timestamp[us]'].diff()  # 時間差分を計算
-    plt.figure(figsize=(10, 6))
-    plt.hist(df['timestamp_diff'].dropna(), bins=50, color='skyblue', edgecolor='black')
-    plt.title('Timestamp Difference Histogram')
-    plt.xlabel('Timestamp Difference [us]')
-    plt.ylabel('Frequency')
-    plt.grid(True)
-    plt.show()
+COLORS = ("red", "green", "blue")
 
-def plot_temperature(df):
-    # 温度の時系列プロット
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['timestamp[us]'], df['temp[celsius]'], color='orange')
-    plt.title('Temperature vs Time')
-    plt.xlabel('Timestamp [us]')
-    plt.ylabel('Temperature [Celsius]')
-    plt.grid(True)
-    plt.show()
-
-def plot_acceleration(df):
-    # 加速度の時系列プロット
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['timestamp[us]'], df['ax[m/s^2]'], label='ax', color='blue')
-    plt.plot(df['timestamp[us]'], df['ay[m/s^2]'], label='ay', color='green')
-    plt.plot(df['timestamp[us]'], df['az[m/s^2]'], label='az', color='red')
-    plt.title('Acceleration vs Time')
-    plt.xlabel('Timestamp [us]')
-    plt.ylabel('Acceleration [m/s^2]')
-    plt.legend(loc='upper right')
-    plt.grid(True)
-    plt.show()
-
-def plot_gyro(df):
-    # ジャイロの時系列プロット
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['timestamp[us]'], df['gx[rad/s]'], label='gx', color='purple')
-    plt.plot(df['timestamp[us]'], df['gy[rad/s]'], label='gy', color='brown')
-    plt.plot(df['timestamp[us]'], df['gz[rad/s]'], label='gz', color='pink')
-    plt.title('Gyroscope vs Time')
-    plt.xlabel('Timestamp [us]')
-    plt.ylabel('Gyroscope [rad/s]')
-    plt.legend(loc='upper right')
-    plt.grid(True)
-    plt.show()
 
 def main(args):
-    # ファイルを読み込む
     df = pd.read_csv(args.input_file)
 
-    # ヒストグラム
-    plot_histogram(df)
+    acc = df[['ax[m/s^2]', 'ay[m/s^2]', 'az[m/s^2]']].to_numpy()
+    gyr = df[['gx[rad/s]', 'gy[rad/s]', 'gz[rad/s]']].to_numpy()
+    timestamp = df['timestamp[us]'].to_numpy()
+    acc_std = acc.std(axis=0)
+    gyr_std = gyr.std(axis=0)
+    gyr_mean = gyr.mean(axis=0)
+    
 
-    # 温度の時系列プロット
-    plot_temperature(df)
-
-    # 加速度の時系列プロット
-    plot_acceleration(df)
-
-    # ジャイロの時系列プロット
-    plot_gyro(df)
+    fix, ax = plt.subplots(4, 2, figsize=(15, 10))
+    for i, (axis, color) in enumerate(zip("xyz", COLORS)):
+        ax[0, 0].plot(timestamp, acc[:, i], label=axis, color=color)
+        ax[0, 0].set_xlabel('Timestamp [us]')
+        ax[0, 0].set_ylabel('Acceleration [m/s^2]')
+        ax[0, 0].legend()
+        ax[i+1, 0].hist(acc[:, i], bins=100, color=color, alpha=0.7)
+        ax[i+1, 0].set_xlabel(f'{axis} [m/s^2]')
+        ax[i+1, 0].text(0.1, 0.9, f"{axis} std: {acc_std[i]:.7f}", transform=ax[i + 1, 0].transAxes)
+    
+        ax[0, 1].plot(timestamp, gyr[:, i], label=axis, color=color)
+        ax[0, 1].set_xlabel('Timestamp [us]')
+        ax[0, 1].set_ylabel('Gyroscope [rad/s]')
+        ax[0, 1].legend()
+        ax[i+1, 1].hist(gyr[:, i], bins=50, color=color, alpha=0.7)
+        ax[i+1, 1].set_xlabel(f'{axis} [rad/s]')
+        ax[i+1, 1].text(0.1, 0.9, f"{axis} std: {gyr_std[i]:.7f}", transform=ax[i + 1, 1].transAxes)
+        ax[i+1, 1].text(0.1, 0.8, f"{axis} mean: {gyr_mean[i]:.7f}", transform=ax[i + 1, 1].transAxes)
+    plt.show()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="IMUデータの解析とプロット")

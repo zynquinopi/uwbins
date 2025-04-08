@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 
-from .runner import online
+from .runner import online, offline
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -19,6 +19,18 @@ def create_parser() -> argparse.ArgumentParser:
         "config", type=str, help="Path to the configuration file."
     )
     parser_online.set_defaults(handler=online)
+
+    # "online" subcommand
+    parser_offline = subparsers.add_parser(
+        "offline", help="Run UWBINS viewer in offline mode."
+    )
+    parser_offline.add_argument(
+        "config", type=str, help="Path to the configuration file."
+    )
+    # parser_offline.add_argument(
+    #     "dataset", type=str, help="Path to the dataset directory."
+    # )
+    parser_offline.set_defaults(handler=offline)
 
     return parser
 

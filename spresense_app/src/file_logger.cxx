@@ -56,7 +56,7 @@ bool init_log_files() {
     }
 
     imu_file << "timestamp[us],temp[celsius],ax[m/s^2],ay[m/s^2],az[m/s^2],gx[rad/s],gy[rad/s],gz[rad/s]" << std::endl;
-    uwb_file << "timestamp[us],anchor_id,nlos,distance[m],azimuth[degrees],elevation[degrees]" << std::endl;
+    uwb_file << "timestamp[us],anchor_id,nlos,distance[m],azimuth[deg],elevation[deg]" << std::endl;
 
     return true;
 }

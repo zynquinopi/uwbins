@@ -1,7 +1,8 @@
 import argparse
-
 import toml
+
 import numpy as np
+import pandas as pd
 
 from .viewer import UwbInsViewer
 from .receiver import UdpReceiver, SerialReceiver
@@ -38,3 +39,41 @@ def online(args: argparse.Namespace) -> None:
     receiver.open()
     receiver.start()
     input("Press Enter⏎ to stop viewer\n")
+
+
+def offline(args: argparse.Namespace) -> None:
+    toml_args = toml.load(args.config)
+
+    anchor_poses = load_anchor_poses(toml_args)
+    viewer = UwbInsViewer(anchor_poses)
+
+    df = pd.read_csv("../data/imu.txt")
+    timestamp = df['timestamp[us]'].values
+    temp = df['temp[celsius]'].values
+    acc = df[['ax[m/s^2]', 'ay[m/s^2]', 'az[m/s^2]']].values
+    gyro = df[['gx[rad/s]', 'gy[rad/s]', 'gz[rad/s]']].values
+    viewer.draw_data_batch(
+        DataType.IMU,
+        [Imu(timestamp[i], temp[i], acc[i], gyro[i]) for i in range(len(timestamp))]
+    )
+
+    df = pd.read_csv("../data/uwb.txt")
+    timestamp = df['timestamp[us]'].values
+    anchor_id = df['anchor_id'].values
+    nlos = df['nlos'].values
+    distance = df['distance[m]'].values
+    azimuth = df['azimuth[deg]'].values
+    elevation = df['elevation[deg]'].values
+    viewer.draw_data_batch(
+        DataType.UWB,
+        [Uwb(timestamp[i], anchor_id[i], nlos[i], distance[i], azimuth[i], elevation[i]) for i in range(len(timestamp))]
+    )
+
+    df = pd.read_csv("../data/pose.txt")
+    timestamp = df['timestamp[us]'].values
+    position = df[['x[m]', 'y[m]', 'z[m]']].values
+    quaternion = df[['qx', 'qy', 'qz', 'qw']].values
+    viewer.draw_data_batch(
+        DataType.POSE,
+        [Pose(timestamp[i], position[i], quaternion[i]) for i in range(len(timestamp))]
+    )
