@@ -67,7 +67,8 @@ int UwbSensorDestroy(FAR physical_sensor_t *sensor) {
 
 int UwbSensorClass::open_sensor() {
     m_fd = open(UWBINS_UWB_DEVNAME, O_RDONLY | O_NONBLOCK);
-    if (m_fd <= 0) {
+    if (m_fd < 0) {
+        err("ERROR: open %s failed. errno=%d\n", UWBINS_UWB_DEVNAME, errno);
         return -1;
     }
     fds[0].fd = m_fd;
@@ -77,24 +78,47 @@ int UwbSensorClass::open_sensor() {
 
 
 int UwbSensorClass::close_sensor() {
-    return close(m_fd);
+    if (m_fd >= 0) {
+        int ret = close(m_fd);
+        m_fd = -1;
+    }
+    fds[0].fd = -1;
+    fds[0].events = 0;
+    return 0;
 }
 
 
 int UwbSensorClass::start_sensor() {
     struct termios tty;
-    tcgetattr(m_fd, &tty);
+    if (tcgetattr(m_fd, &tty) != 0) {
+        err("ERROR: tcgetattr failed. errno=%d\n", errno);
+        return -1;
+    }
+
     tty.c_cflag |= CREAD;
-    tcsetattr(m_fd, TCSANOW, &tty);
+    
+    if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
+        err("ERROR: tcsetattr failed. errno=%d\n", errno);
+        return -1;
+    }
     return 0;
 }
 
 
 int UwbSensorClass::stop_sensor() {
     struct termios tty;
-    tcgetattr(m_fd, &tty);
-    tty.c_cflag &= CREAD;
-    tcsetattr(m_fd, TCSANOW, &tty);
+    if (tcgetattr(m_fd, &tty) != 0) {
+        err("ERROR: tcgetattr failed. errno=%d\n", errno);
+        return -1;
+    }
+
+    tty.c_cflag &= ~CREAD;
+
+    if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
+        err("ERROR: tcsetattr failed. errno=%d\n", errno);
+        return -1;
+    }
+    tcflush(m_fd, TCIFLUSH);
     return 0;
 }
 
