@@ -60,3 +60,13 @@ bool init_log_files() {
 
     return true;
 }
+
+bool close_log_files() {
+    if (imu_file.is_open()) {
+        imu_file.close();
+    }
+    if (uwb_file.is_open()) {
+        uwb_file.close();
+    }
+    return true;
+}

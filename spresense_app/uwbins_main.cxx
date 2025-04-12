@@ -1,5 +1,7 @@
 #include <nuttx/config.h>
 #include <stdio.h>
+#include <arch/board/board.h>
+#include <arch/chip/pin.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
@@ -15,6 +17,12 @@
 #include "include/file_logger.h"
 
 
+#define PIN_LED0 PIN_I2S1_BCK
+#define PIN_LED1 PIN_I2S1_LRCK
+#define PIN_LED2 PIN_I2S1_DATA_IN
+#define PIN_LED3 PIN_I2S1_DATA_OUT
+#define PIN_BUTTON PIN_SPI3_CS1_X
+
 #define UDP_IP "192.168.11.11"
 #define UDP_PORT 50000
 
@@ -26,7 +34,36 @@
 static Madgwick madgwick_filter;
 static int udp_sock;
 static struct sockaddr_in udp_addr;
+volatile bool g_start_requested = false;
 
+static int button_handler(int irq, void *context, void *arg) {
+    g_start_requested = !g_start_requested;
+    return OK;
+}
+
+static void init_leds(void) {
+    board_gpio_write(PIN_LED0, -1);
+    board_gpio_config(PIN_LED0, 0, false, true, PIN_FLOAT);
+    board_gpio_write(PIN_LED1, -1);
+    board_gpio_config(PIN_LED1, 0, false, true, PIN_FLOAT);
+    board_gpio_write(PIN_LED2, -1);
+    board_gpio_config(PIN_LED2, 0, false, true, PIN_FLOAT);
+    board_gpio_write(PIN_LED3, -1);
+    board_gpio_config(PIN_LED3, 0, false, true, PIN_FLOAT);
+}
+
+static void set_leds(int ptn){
+    board_gpio_write(PIN_LED0, (ptn & 0x01) ? 1 : 0);
+    board_gpio_write(PIN_LED1, (ptn & 0x02) ? 1 : 0);
+    board_gpio_write(PIN_LED2, (ptn & 0x04) ? 1 : 0);
+    board_gpio_write(PIN_LED3, (ptn & 0x08) ? 1 : 0);
+}
+
+static void init_gpio(void) {
+    board_gpio_config(PIN_BUTTON, 0, true, false, PIN_PULLUP);
+    board_gpio_intconfig(PIN_BUTTON, INT_FALLING_EDGE, true, button_handler);
+    board_gpio_int(PIN_BUTTON, true); //enable interrupt
+}
 
 static int imu_read_callback(uint32_t ev_type,
                              uint32_t timestamp,
@@ -91,10 +128,11 @@ static int uwb_read_callback(uint32_t ev_type,
 
 
 extern "C" int uwbins_main(int argc, FAR char *argv[]) {
-    if (!init_log_files()) {
-        err("Error: open_sensor_logs() failure.\n");
-        return EXIT_FAILURE;
-    }
+    bool started = false;
+    bool led_on = true;
+    int led_blink_counter = 0;
+    init_leds();
+    init_gpio();
 
     udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_sock < 0) {
@@ -114,15 +152,11 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         err("Error: ImuSensorCreate() failure.\n");
         return EXIT_FAILURE;
     }
-    FAR physical_sensor_t *uwb = UwbSensorCreate(uwb_read_callback);
+    physical_sensor_t *uwb = UwbSensorCreate(uwb_read_callback);
     if (uwb == NULL) {
         err("Error: UwbSensorCreate() failure.\n");
         return EXIT_FAILURE;
     }
-
-    message("start sensoring...\n");
-
-    /* Start physical sensor process. */
     if (ImuSensorOpen(imu) < 0) {
         err("Error: ImuSensorOpen() failure.\n");
         return EXIT_FAILURE;
@@ -131,54 +165,63 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
         err("Error: UwbSensorOpen() failure.\n");
         return EXIT_FAILURE;
     }
-    if (ImuSensorStart(imu) < 0) {
-        err("Error: ImuSensorStart() failure.\n");
-        return EXIT_FAILURE;
-    }
-    if (UwbSensorStart(uwb) < 0) {
-        err("Error: UwbSensorStart() failure.\n");
-        return EXIT_FAILURE;
-    }
+    message("Setup done.\n");
 
     while (1) {
-        /* Wait exit request. */
-        if (fgetc(stdin) == EXIT_REQUEST_KEY) {
-            break;
+        if (g_start_requested && !started) {
+            if (!init_log_files()) {
+                err("Error: open_sensor_logs() failure.\n");
+                return EXIT_FAILURE;
+            }
+            usleep(1000 * 1000);
+            if (ImuSensorStart(imu) < 0) {
+                err("Error: ImuSensorStart() failure.\n");
+                return EXIT_FAILURE;
+            }
+            if (UwbSensorStart(uwb) < 0) {
+                err("Error: UwbSensorStart() failure.\n");
+                return EXIT_FAILURE;
+            }
+            started = true;
+            printf("Capturing...\n");
+        } else if (!g_start_requested && started) {
+            if (ImuSensorStop(imu) < 0) {
+                err("Error: ImuSensorStop() failure.\n");
+                return EXIT_FAILURE;
+            }
+            if (UwbSensorStop(uwb) < 0) {
+                err("Error: UwbSensorStop() failure.\n");
+                return EXIT_FAILURE;
+            }
+            close_log_files();
+            printf("Capture stop.\n");
+            started = false;
         }
-        usleep(200 * 1000);
-        break;
+        if (started) {
+            if (++led_blink_counter >= 1) { // 100ms * 5 = 500ms
+                led_on = !led_on;
+                set_leds(led_on ? 0x0F : 0x00);
+                led_blink_counter = 0;
+            }
+        } else {
+            set_leds(0x0F);
+        }
+      usleep(100 * 1000); // 100ms
     }
 
-    /* Stop physical sensor. */
-    if (ImuSensorStop(imu) < 0) {
-        err("Error: ImuSensorStop() failure.\n");
-        return EXIT_FAILURE;
-    }
-    printf("ImuSensorStop() success.\n");
+    message("Finalizing...\n");
     if (ImuSensorClose(imu) < 0) {
         err("Error: ImuSensorClose() failure.\n");
         return EXIT_FAILURE;
     }
-    // printf("ImuSensorClose() success.\n");
-    if (UwbSensorStop(uwb) < 0) {
-        err("Error: UwbSensorStop() failure.\n");
-        return EXIT_FAILURE;
-    }
-    printf("UwbSensorStop() success.\n");
     if (UwbSensorClose(uwb) < 0) {
         err("Error: UwbSensorClose() failure.\n");
         return EXIT_FAILURE;
     }
-    printf("UwbSensorClose() success.\n");
-
-    imu_file.close();
-    uwb_file.close();
-
+    close_log_files();
     ImuSensorDestroy(imu);
-    printf("ImuSensorDestroy() success.\n");
     UwbSensorDestroy(uwb);
-    printf("UwbSensorDestroy() success.\n");
     close(udp_sock);
-    printf("close() success.\n");
+    message("Finalized.\n");
     return EXIT_SUCCESS;
 }

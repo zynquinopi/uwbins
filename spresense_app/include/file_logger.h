@@ -10,5 +10,6 @@ extern std::ofstream imu_file;
 extern std::ofstream uwb_file;
 
 bool init_log_files();
+bool close_log_files();
 
 #endif // LOG_WRITER_HPP
