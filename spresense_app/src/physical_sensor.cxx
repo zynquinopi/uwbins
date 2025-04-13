@@ -129,7 +129,7 @@ FAR physical_sensor_t *PhysicalSensorCreate(pysical_event_handler_t handler,
     sch_param.sched_priority = TASK_PRIORITY;
     attr.stacksize = TASK_STACK_SIZE;
     pthread_attr_setschedparam(&attr, &sch_param);
-    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+    pthread_attr_setschedpolicy(&attr, SCHED_RR);
     int ret = pthread_create(&thread_id,
                              &attr,
                              (pthread_startroutine_t)entry_function,

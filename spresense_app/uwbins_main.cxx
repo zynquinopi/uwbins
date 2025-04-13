@@ -8,7 +8,13 @@
 #include <sys/socket.h>
 #include <memory>
 #include <iostream>
+#include <fstream>
+#include <pthread.h>
+#include <nuttx/sched_note.h>  // struct task_info_s
+#include <nuttx/sched.h>
 
+
+#include "include/queue.h"
 #include "include/imu_sensor.h"
 #include "include/uwb_sensor.h"
 #include "sensing/sensor_ecode.h"
@@ -35,6 +41,46 @@ static Madgwick madgwick_filter;
 static int udp_sock;
 static struct sockaddr_in udp_addr;
 volatile bool g_start_requested = false;
+
+SafeQueue<Packet> fileQueue;
+SafeQueue<Packet> udpQueue;
+
+
+void* file_writer_thread(void*) {
+    while (true) {
+        // printf("[file] backlog=%zu\n", fileQueue.size());
+        Packet packet = fileQueue.wait_and_pop();
+        // if (packet.type == PacketType::POSE) {
+        //     continue;
+        // } else if (packet.type == PacketType::IMU) {
+        //     imu_file << packet.timestamp << ","
+        //              << packet.imu.temp << ","
+        //              << packet.imu.ax << ","
+        //              << packet.imu.ay << ","
+        //              << packet.imu.az << ","
+        //              << packet.imu.gx << ","
+        //              << packet.imu.gy << ","
+        //              << packet.imu.gz << std::endl;
+        // } else if (packet.type == PacketType::UWB) {
+        //     uwb_file << packet.timestamp << ","
+        //              << static_cast<int>(packet.uwb.anchor_id) << ","
+        //              << static_cast<int>(packet.uwb.nlos) << ","
+        //              << packet.uwb.distance << ","
+        //              << packet.uwb.azimuth << ","
+        //              << packet.uwb.elevation << std::endl;
+        // }
+    }
+    return nullptr;
+}
+
+void* udp_sender_thread(void*) {
+    while (true) {
+        // printf("[udp] backlog=%zu\n", udpQueue.size());
+        Packet data = udpQueue.wait_and_pop();
+        // sendto(udp_sock, &data, sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+    }
+    return nullptr;
+}
 
 static int button_handler(int irq, void *context, void *arg) {
     g_start_requested = !g_start_requested;
@@ -68,15 +114,32 @@ static void init_gpio(void) {
 static int imu_read_callback(uint32_t ev_type,
                              uint32_t timestamp,
                              char* data) {
+    // print cpu time
+    // printf("[imu] cpu time=%f\n", static_cast<float>(clock()) / CLOCKS_PER_SEC);
+    struct task_info_s info;
+    int ret = task_info(pid, &info);
+
+    if (ret == OK && info.stack_size > 0)
+    {
+        float used_percent = (float)info.stack_used * 100.0f / (float)info.stack_size;
+
+        printf("[PID: %d] STACK: %zu bytes, USED: %zu bytes, FILLED: %.1f%%\n",
+               pid, info.stack_size, info.stack_used, used_percent);
+    }
+
+
     Packet *imu_packet = reinterpret_cast<Packet*>(data);
     std::unique_ptr<Packet[]> pose_packet(new Packet[IMU_NUM_FIFO]);
 
     for (int i = 0; i < IMU_NUM_FIFO; i++) {
+        // fileQueue.push(imu_packet[i]);
+        // udpQueue.push(imu_packet[i]);
+        // printf("[imuc]ts=%f, type=%d\n", imu_packet[i].timestamp, static_cast<int>(imu_packet[i].type));
         // printf("[ imu]ts=%f, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
         //        imu_data[i].data.timestamp / 19200000.0f, imu_data[i].data.temp,
         //        imu_data[i].data.ax, imu_data[i].data.ay, imu_data[i].data.az,
         //        imu_data[i].data.gx, imu_data[i].data.gy, imu_data[i].data.gz);
-        sendto(udp_sock, &imu_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        // sendto(udp_sock, &imu_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
         imu_file << imu_packet[i].timestamp << ","
                  << imu_packet[i].imu.temp << ","
                  << imu_packet[i].imu.ax << ","
@@ -97,7 +160,7 @@ static int imu_read_callback(uint32_t ev_type,
         pose_packet[i].timestamp = imu_packet[i].timestamp;
         pose_packet[i].pose.x = 0.0f; pose_packet[i].pose.y = 0.0f; pose_packet[i].pose.z = 0.0f;
         pose_packet[i].pose.qx = q[1]; pose_packet[i].pose.qy = q[2]; pose_packet[i].pose.qz = q[3]; pose_packet[i].pose.qw = q[0];
-        sendto(udp_sock, &pose_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        // sendto(udp_sock, &pose_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
     }
     return 0;
 }
@@ -111,13 +174,15 @@ static int uwb_read_callback(uint32_t ev_type,
         if (packet[i].uwb.anchor_id < 0) {
             continue;
         }
-        sendto(udp_sock, &packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
-        uwb_file << packet[i].timestamp << ","
-                 << static_cast<int>(packet[i].uwb.anchor_id) << ","
-                 << static_cast<int>(packet[i].uwb.nlos) << ","
-                 << packet[i].uwb.distance << ","
-                 << packet[i].uwb.azimuth << ","
-                 << packet[i].uwb.elevation << std::endl;
+        // fileQueue.push(packet[i]);
+        // udpQueue.push(packet[i]);
+        // sendto(udp_sock, &packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        // uwb_file << packet[i].timestamp << ","
+        //          << static_cast<int>(packet[i].uwb.anchor_id) << ","
+        //          << static_cast<int>(packet[i].uwb.nlos) << ","
+        //          << packet[i].uwb.distance << ","
+        //          << packet[i].uwb.azimuth << ","
+        //          << packet[i].uwb.elevation << std::endl;
         // printf("[ uwb]ts=%f, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
         //        packet[i].timestamp, packet[i].uwb.anchor_id,
         //        packet[i].uwb.nlos, packet[i].uwb.distance,
@@ -145,6 +210,18 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     inet_pton(AF_INET, UDP_IP, &udp_addr.sin_addr);
 
     madgwick_filter.begin(IMU_SAMPLING_FREQUENCY);
+
+
+    pthread_attr_t attr;
+    struct sched_param sch_param;
+    pthread_attr_init(&attr);
+    sch_param.sched_priority = 110;
+    attr.stacksize = 1024 * 2;
+    pthread_attr_setschedparam(&attr, &sch_param);
+    pthread_attr_setschedpolicy(&attr, SCHED_RR);
+    pthread_t log_thread, net_thread;
+    pthread_create(&log_thread, &attr, file_writer_thread, NULL);
+    pthread_create(&net_thread, &attr, udp_sender_thread, NULL);
 
 
     physical_sensor_t *imu = ImuSensorCreate(imu_read_callback);
@@ -178,10 +255,10 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
                 err("Error: ImuSensorStart() failure.\n");
                 return EXIT_FAILURE;
             }
-            if (UwbSensorStart(uwb) < 0) {
-                err("Error: UwbSensorStart() failure.\n");
-                return EXIT_FAILURE;
-            }
+            // if (UwbSensorStart(uwb) < 0) {
+            //     err("Error: UwbSensorStart() failure.\n");
+            //     return EXIT_FAILURE;
+            // }
             started = true;
             printf("Capturing...\n");
         } else if (!g_start_requested && started) {
@@ -189,10 +266,10 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
                 err("Error: ImuSensorStop() failure.\n");
                 return EXIT_FAILURE;
             }
-            if (UwbSensorStop(uwb) < 0) {
-                err("Error: UwbSensorStop() failure.\n");
-                return EXIT_FAILURE;
-            }
+            // if (UwbSensorStop(uwb) < 0) {
+            //     err("Error: UwbSensorStop() failure.\n");
+            //     return EXIT_FAILURE;
+            // }
             close_log_files();
             printf("Capture stop.\n");
             started = false;
