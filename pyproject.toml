@@ -13,7 +13,7 @@ pyserial = "^3.5"
 toml = "^0.10.2"
 matplotlib = "^3.10.1"
 scipy = "^1.15.2"
-ukfm = {path = "external/ukfm/python", develop = true}
+# ukfm = {path = "external/ukfm/python", develop = true}
 
 [build-system]
 requires = ["poetry-core"]
