@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <errno.h>
+#include <sched.h>
+#include <memory>
 #include <nuttx/sensors/cxd5602pwbimu.h>
 
 #include "include/imu_sensor.h"
@@ -79,7 +81,17 @@ int ImuSensorClass::close_sensor() {
 
 
 int ImuSensorClass::start_sensor() {
-    return ioctl(m_fd, SNIOC_ENABLE, 1);
+    int ret = ioctl(m_fd, SNIOC_ENABLE, 1);
+    if (ret) {
+        err("ERROR: SNIOC_ENABLE failed. %d\n", ret);
+        return -1;
+    }
+    ret = read_away_50ms_data();
+    if (ret) {
+        err("ERROR: read_away_50ms_data failed.\n");
+        return -1;
+    }
+    return ret;
 }
 
 
@@ -115,16 +127,9 @@ int ImuSensorClass::setup_sensor(FAR void *param) {
 
 
 int ImuSensorClass::read_data() {
-    MemMgrLite::MemHandle mh;
-    FAR char *ptr;
-
-    /* Get segment of memory handle. */
-    if (ERR_OK != mh.allocSeg(S0_IMU_DATA_BUF_POOL, sizeof(cxd5602pwbimu_data_t))) {
-        err("Fail to allocate segment of memory handle.\n");
-        ASSERT(0);
-    }
-    ptr = reinterpret_cast<char *>(mh.getPa());
-
+    std::unique_ptr<Packet[]> out(new Packet[IMU_NUM_FIFO]);
+    std::unique_ptr<char[]> ptr(new char[sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO]);
+    
     /* Read imu data from driver. */
     int ret = poll(fds, 1, 1000);
     if (ret < 0) {
@@ -136,20 +141,34 @@ int ImuSensorClass::read_data() {
         err("ERROR: poll timeout.\n");
     }
     if (fds[0].revents & POLLIN) {
-        ret = read(m_fd, ptr, sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
+        ret = read(m_fd, ptr.get(), sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO);
         if (ret != sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO) {
             err("ERROR: read failed. %d\n", errno);
         }
     }
-
-    this->notify_data(mh);
-
-    mh.freeSeg();
+    cxd5602pwbimu_data_t* imu_raw = reinterpret_cast<cxd5602pwbimu_data_t *>(ptr.get());
+    uint64_t base_timestamp = ((uint64_t)imu_raw[3].timestamp * 1000000ULL) / 19200000ULL;
+    for (auto i = IMU_NUM_FIFO - 1; i >= 0; i--) {
+        out[i].type = PacketType::IMU;
+        uint64_t tmp_timestamp = ((uint64_t)imu_raw[i].timestamp * 1000000ULL) / 19200000ULL;
+        out[i].timestamp = get_us_timestamp() - (base_timestamp - tmp_timestamp);
+        memcpy(&out[i].imu, &imu_raw[i], sizeof(cxd5602pwbimu_data_t));
+    }
+    m_handler(0, get_timestamp(), reinterpret_cast<char *>(out.get()));
     return 0;
 }
 
 
-int ImuSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
-    uint32_t timestamp = get_timestamp();
-    return m_handler(0, timestamp, mh);
-};
+int ImuSensorClass::read_away_50ms_data() {
+    int cnt = IMU_SAMPLING_FREQUENCY / 20 * 3; /* data size of 50ms */
+    cnt = ((cnt + IMU_NUM_FIFO - 1) / IMU_NUM_FIFO) * IMU_NUM_FIFO;
+    if (cnt == 0) cnt = IMU_NUM_FIFO;
+
+    cxd5602pwbimu_data_t tmp_data[IMU_NUM_FIFO];
+    while (cnt) {
+        read(m_fd, tmp_data, sizeof(tmp_data[0]) * IMU_NUM_FIFO);
+        cnt -= IMU_NUM_FIFO;
+    }
+
+    return 0;
+}

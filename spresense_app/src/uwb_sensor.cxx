@@ -7,12 +7,14 @@
 #include <poll.h>
 #include <errno.h>
 #include <termios.h>
+#include <memory>
 
 #include "include/uwb_sensor.h"
 
 
 #define UWBINS_UWB_DEVNAME "/dev/ttyS2"
 #define UWB_BAUDRATE B2000000
+#define CM_2_M 0.01f
 
 #define err(format, ...)    fprintf(stderr, format, ##__VA_ARGS__)
 
@@ -65,7 +67,8 @@ int UwbSensorDestroy(FAR physical_sensor_t *sensor) {
 
 int UwbSensorClass::open_sensor() {
     m_fd = open(UWBINS_UWB_DEVNAME, O_RDONLY | O_NONBLOCK);
-    if (m_fd <= 0) {
+    if (m_fd < 0) {
+        err("ERROR: open %s failed. errno=%d\n", UWBINS_UWB_DEVNAME, errno);
         return -1;
     }
     fds[0].fd = m_fd;
@@ -75,24 +78,47 @@ int UwbSensorClass::open_sensor() {
 
 
 int UwbSensorClass::close_sensor() {
-    return close(m_fd);
+    if (m_fd >= 0) {
+        int ret = close(m_fd);
+        m_fd = -1;
+    }
+    fds[0].fd = -1;
+    fds[0].events = 0;
+    return 0;
 }
 
 
 int UwbSensorClass::start_sensor() {
     struct termios tty;
-    tcgetattr(m_fd, &tty);
+    if (tcgetattr(m_fd, &tty) != 0) {
+        err("ERROR: tcgetattr failed. errno=%d\n", errno);
+        return -1;
+    }
+
     tty.c_cflag |= CREAD;
-    tcsetattr(m_fd, TCSANOW, &tty);
+    
+    if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
+        err("ERROR: tcsetattr failed. errno=%d\n", errno);
+        return -1;
+    }
     return 0;
 }
 
 
 int UwbSensorClass::stop_sensor() {
     struct termios tty;
-    tcgetattr(m_fd, &tty);
-    tty.c_cflag &= CREAD;
-    tcsetattr(m_fd, TCSANOW, &tty);
+    if (tcgetattr(m_fd, &tty) != 0) {
+        err("ERROR: tcgetattr failed. errno=%d\n", errno);
+        return -1;
+    }
+
+    tty.c_cflag &= ~CREAD;
+
+    if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
+        err("ERROR: tcsetattr failed. errno=%d\n", errno);
+        return -1;
+    }
+    tcflush(m_fd, TCIFLUSH);
     return 0;
 }
 
@@ -100,7 +126,6 @@ int UwbSensorClass::stop_sensor() {
 int UwbSensorClass::setup_sensor(FAR void *param) {
     struct termios tty;
     tcgetattr(m_fd, &tty);
-    // cfsetospeed(&tty, UWB_BAUDRATE);
     cfsetispeed(&tty, UWB_BAUDRATE);
     tty.c_cflag &= ~PARENB;  // parity : none
     tty.c_cflag &= ~CSTOPB;  // stop bit : 1
@@ -115,17 +140,8 @@ int UwbSensorClass::setup_sensor(FAR void *param) {
 
 
 int UwbSensorClass::read_data() {
-    char buffer[256]; //TDOO : use Memory pool
+    std::unique_ptr<char[]> buffer(new char[512]);
     size_t buffer_index = 0;
-    MemMgrLite::MemHandle mh;
-    FAR char *ptr;
-
-    /* Get segment of memory handle. */
-    if (ERR_OK != mh.allocSeg(S0_UWB_DATA_BUF_POOL, sizeof(type2bp_data_t) * UWB_NUM_ANCHOR)) {
-        err("Fail to allocate segment of memory handle.\n");
-        return -1;
-    }
-    ptr = reinterpret_cast<char *>(mh.getPa());
 
     tcflush(m_fd, TCIFLUSH);
 
@@ -144,20 +160,25 @@ int UwbSensorClass::read_data() {
             break;
         }
         if (fds[0].revents & POLLIN) {
-            uint8_t byte;
-            ssize_t num_bytes = read(m_fd, &byte, 1);
+            usleep(3 * 1000);
+            int num_bufers;
+            ioctl(m_fd, FIONREAD, &num_bufers);
+            // uint8_t byte;
+            ssize_t num_bytes = read(m_fd, buffer.get(), num_bufers);
             if (num_bytes > 0) {
-                buffer[buffer_index++] = byte;
-                if (byte == '\n') {
-                    buffer[buffer_index] = '\0';
-                    // printf("raw : %s\n", ptr);
-                    type2bp_data_t* data_array = reinterpret_cast<type2bp_data_t*>(ptr);
-                    parse_uwb_data(buffer, data_array);
-
-                    this->notify_data(mh);
-                    mh.freeSeg();
+                // buffer[buffer_index++] = byte;
+                // if (byte == '\n') {
+                    buffer[num_bufers] = '\0';
+                    std::unique_ptr<Type2bp[]> data_array(new Type2bp[UWB_NUM_ANCHOR]);
+                    parse_uwb_data(buffer.get(), data_array.get());
+                    std::unique_ptr<Packet[]> out(new Packet[UWB_NUM_ANCHOR]);
+                    for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
+                        out[i].type = PacketType::UWB;
+                        out[i].timestamp = get_us_timestamp();
+                        memcpy(&out[i].uwb, &data_array[i], sizeof(Type2bp));
+                    }
+                    m_handler(0, 0, reinterpret_cast<char *>(out.get()));
                     return 0;
-                }
                 if (buffer_index >= sizeof(buffer)) {
                     err("Frame length exceeded maximum allowed size.\n");
                     buffer_index = 0;
@@ -172,14 +193,12 @@ int UwbSensorClass::read_data() {
             }
         }
     }
-    mh.freeSeg();
     return -1;
 }
 
 
-void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_array) {
+void UwbSensorClass::parse_uwb_data(const char* src_data, Type2bp* data_array) {
     for (auto i = 0; i < UWB_NUM_ANCHOR; i++) {
-        data_array[i].timestamp = 0u;
         data_array[i].anchor_id = -1;
         data_array[i].nlos      = 0u;
         data_array[i].distance  = 0.0f;
@@ -188,10 +207,10 @@ void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_a
     }
 
     while ((src_data = strstr(src_data, "i")) != NULL) {
-        type2bp_data_t data;
-        data.timestamp = 0;
-        if (sscanf(src_data, "i%ld,n%lu,d%f,a%f,e%f,",
+        Type2bp data;
+        if (sscanf(src_data, "i%hhd,n%hhu,d%f,a%f,e%f,",
                    &data.anchor_id, &data.nlos, &data.distance, &data.azimuth, &data.elevation) == 5){
+            data.distance *= CM_2_M;
             if (data.anchor_id >= 0 && data.anchor_id < UWB_NUM_ANCHOR) {
                 data_array[data.anchor_id] = data;
             }
@@ -201,7 +220,7 @@ void UwbSensorClass::parse_uwb_data(const char* src_data, type2bp_data_t* data_a
 }
 
 
-int UwbSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
-    uint32_t timestamp = get_timestamp();
-    return m_handler(0, timestamp, mh);
-};
+// int UwbSensorClass::notify_data(MemMgrLite::MemHandle &mh) {
+//     uint32_t timestamp = get_timestamp();
+//     return m_handler(0, timestamp, mh);
+// };

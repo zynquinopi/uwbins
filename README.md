@@ -49,3 +49,13 @@ sdk/tools/flash.sh -w examples/uwbins/init.rc
 cd external/spresense
 spresense tools/mkdefconfig.py -d ../examples/uwbins release
 ```
+
+### Mount SD
+```
+nsh> msconn
+mcsonn_main: Creating block drivers
+mcsonn_main: Configuring with NLUNS=1
+mcsonn_main: handle=0x2d04b690
+mcsonn_main: Bind LUN=0 to /dev/mmcsd0
+mcsonn_main: Connected
+```
