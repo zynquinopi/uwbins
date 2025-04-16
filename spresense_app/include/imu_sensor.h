@@ -4,6 +4,7 @@
 
 #include <poll.h>
 #include <nuttx/sensors/cxd5602pwbimu.h>
+#include <memory>
 
 #include "physical_sensor.h"
 #include "include/types.h"
@@ -12,7 +13,7 @@
 #define IMU_SAMPLING_FREQUENCY   120 //15, 30, 60, 120, 240, 480, 960, 1920 [Hz]
 #define IMU_ACCEL_DRANGE          2 // 2, 4, 8, 16 [g]
 #define IMU_GYRO_DRANGE         500 // 125, 250, 500, 1000, 2000, 4000 [dps]
-#define IMU_NUM_FIFO              4 // 1, 2, 3, 4
+#define IMU_NUM_FIFO              1 // 1, 2, 3, 4
 
 
 extern "C" {
@@ -55,6 +56,7 @@ private:
 
   int m_fd;
   struct pollfd fds[1];
+  std::unique_ptr<Packet[]> out;
+  std::unique_ptr<char[]> ptr;
 };
-
 #endif /* _EXAMPLES_UWBINS_IMU_SENSOR_H */

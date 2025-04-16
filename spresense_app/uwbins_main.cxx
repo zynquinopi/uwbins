@@ -1,166 +1,114 @@
 #include <nuttx/config.h>
-#include <stdio.h>
+#include <nuttx/sched.h>
+#include <nuttx/sched_note.h>  // struct task_info_s
 #include <arch/board/board.h>
-#include <arch/chip/pin.h>
+#include <stdio.h>
 #include <sys/ioctl.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <pthread.h>
 #include <memory>
 #include <iostream>
 #include <fstream>
-#include <pthread.h>
-#include <nuttx/sched_note.h>  // struct task_info_s
-#include <nuttx/sched.h>
+// #include <MadgwickAHRS.h>
 
 
+#include "include/types.h"
 #include "include/queue.h"
+#include "include/gpio_led.h"
+#include "include/file_logger.h"
 #include "include/imu_sensor.h"
 #include "include/uwb_sensor.h"
-#include "sensing/sensor_ecode.h"
-#include "include/types.h"
 #include "include/MadgwickAHRS.h"
-#include "include/file_logger.h"
 
-
-#define PIN_LED0 PIN_I2S1_BCK
-#define PIN_LED1 PIN_I2S1_LRCK
-#define PIN_LED2 PIN_I2S1_DATA_IN
-#define PIN_LED3 PIN_I2S1_DATA_OUT
-#define PIN_BUTTON PIN_SPI3_CS1_X
 
 #define UDP_IP "192.168.11.11"
 #define UDP_PORT 50000
-
-#define EXIT_REQUEST_KEY 0x20 /* space key */
-
 #define message(format, ...) printf(format, ##__VA_ARGS__)
 #define err(format, ...) fprintf(stderr, format, ##__VA_ARGS__)
+
 
 static Madgwick madgwick_filter;
 static int udp_sock;
 static struct sockaddr_in udp_addr;
-volatile bool g_start_requested = false;
 
 SafeQueue<Packet> fileQueue;
 SafeQueue<Packet> udpQueue;
+SafeQueue<Packet> slamQueue;
+
+std::unique_ptr<Packet> pose_packet;
 
 
 void* file_writer_thread(void*) {
     while (true) {
-        // printf("[file] backlog=%zu\n", fileQueue.size());
+        printf("[file] backlog=%zu\n", fileQueue.size());
         Packet packet = fileQueue.wait_and_pop();
-        // if (packet.type == PacketType::POSE) {
-        //     continue;
-        // } else if (packet.type == PacketType::IMU) {
-        //     imu_file << packet.timestamp << ","
-        //              << packet.imu.temp << ","
-        //              << packet.imu.ax << ","
-        //              << packet.imu.ay << ","
-        //              << packet.imu.az << ","
-        //              << packet.imu.gx << ","
-        //              << packet.imu.gy << ","
-        //              << packet.imu.gz << std::endl;
-        // } else if (packet.type == PacketType::UWB) {
-        //     uwb_file << packet.timestamp << ","
-        //              << static_cast<int>(packet.uwb.anchor_id) << ","
-        //              << static_cast<int>(packet.uwb.nlos) << ","
-        //              << packet.uwb.distance << ","
-        //              << packet.uwb.azimuth << ","
-        //              << packet.uwb.elevation << std::endl;
-        // }
+        if (packet.type == PacketType::POSE) {
+            continue;
+        } else if (packet.type == PacketType::IMU) {
+            imu_file << packet.timestamp << ","
+                     << packet.imu.temp << ","
+                     << packet.imu.ax << ","
+                     << packet.imu.ay << ","
+                     << packet.imu.az << ","
+                     << packet.imu.gx << ","
+                     << packet.imu.gy << ","
+                     << packet.imu.gz << std::endl;
+        } else if (packet.type == PacketType::UWB) {
+            uwb_file << packet.timestamp << ","
+                     << static_cast<int>(packet.uwb.anchor_id) << ","
+                     << static_cast<int>(packet.uwb.nlos) << ","
+                     << packet.uwb.distance << ","
+                     << packet.uwb.azimuth << ","
+                     << packet.uwb.elevation << std::endl;
+        }
     }
     return nullptr;
 }
 
 void* udp_sender_thread(void*) {
     while (true) {
-        // printf("[udp] backlog=%zu\n", udpQueue.size());
+        printf("[udp] backlog=%zu\n", udpQueue.size());
         Packet data = udpQueue.wait_and_pop();
-        // sendto(udp_sock, &data, sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
+        sendto(udp_sock, &data, sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
     }
     return nullptr;
 }
 
-static int button_handler(int irq, void *context, void *arg) {
-    g_start_requested = !g_start_requested;
-    return OK;
-}
-
-static void init_leds(void) {
-    board_gpio_write(PIN_LED0, -1);
-    board_gpio_config(PIN_LED0, 0, false, true, PIN_FLOAT);
-    board_gpio_write(PIN_LED1, -1);
-    board_gpio_config(PIN_LED1, 0, false, true, PIN_FLOAT);
-    board_gpio_write(PIN_LED2, -1);
-    board_gpio_config(PIN_LED2, 0, false, true, PIN_FLOAT);
-    board_gpio_write(PIN_LED3, -1);
-    board_gpio_config(PIN_LED3, 0, false, true, PIN_FLOAT);
-}
-
-static void set_leds(int ptn){
-    board_gpio_write(PIN_LED0, (ptn & 0x01) ? 1 : 0);
-    board_gpio_write(PIN_LED1, (ptn & 0x02) ? 1 : 0);
-    board_gpio_write(PIN_LED2, (ptn & 0x04) ? 1 : 0);
-    board_gpio_write(PIN_LED3, (ptn & 0x08) ? 1 : 0);
-}
-
-static void init_gpio(void) {
-    board_gpio_config(PIN_BUTTON, 0, true, false, PIN_PULLUP);
-    board_gpio_intconfig(PIN_BUTTON, INT_FALLING_EDGE, true, button_handler);
-    board_gpio_int(PIN_BUTTON, true); //enable interrupt
+void* slam_est_thread(void*) {
+    while (true) {
+        printf("[slam] backlog=%zu\n", slamQueue.size());
+        Packet packet = slamQueue.wait_and_pop();
+        if (packet.type == PacketType::IMU) {
+            madgwick_filter.updateIMU(packet.imu.gx, packet.imu.gy, packet.imu.gz,
+                                      packet.imu.ax, packet.imu.ay, packet.imu.az);
+            float q[4];
+            madgwick_filter.getQuaternion(q);
+            // printf("[pose]ts=%f, x=0.0,y=0.0, z=0.0, qx=%f, qy=%f, qz=%f, qw=%f\n",
+            //        packet.timestamp / 19200000.0f, q[0], q[1], q[2], q[3]);
+            pose_packet->type = PacketType::POSE;
+            pose_packet->timestamp = packet.timestamp;
+            pose_packet->pose.x = 0.0f; pose_packet->pose.y = 0.0f; pose_packet->pose.z = 0.0f;
+            pose_packet->pose.qx = q[1]; pose_packet->pose.qy = q[2]; pose_packet->pose.qz = q[3]; pose_packet->pose.qw = q[0];
+            udpQueue.push(*pose_packet);
+        }
+    }
+    return nullptr;
 }
 
 static int imu_read_callback(uint32_t ev_type,
                              uint32_t timestamp,
                              char* data) {
-    // print cpu time
-    // printf("[imu] cpu time=%f\n", static_cast<float>(clock()) / CLOCKS_PER_SEC);
-    struct task_info_s info;
-    int ret = task_info(pid, &info);
-
-    if (ret == OK && info.stack_size > 0)
-    {
-        float used_percent = (float)info.stack_used * 100.0f / (float)info.stack_size;
-
-        printf("[PID: %d] STACK: %zu bytes, USED: %zu bytes, FILLED: %.1f%%\n",
-               pid, info.stack_size, info.stack_used, used_percent);
-    }
-
-
     Packet *imu_packet = reinterpret_cast<Packet*>(data);
-    std::unique_ptr<Packet[]> pose_packet(new Packet[IMU_NUM_FIFO]);
-
     for (int i = 0; i < IMU_NUM_FIFO; i++) {
         // fileQueue.push(imu_packet[i]);
-        // udpQueue.push(imu_packet[i]);
-        // printf("[imuc]ts=%f, type=%d\n", imu_packet[i].timestamp, static_cast<int>(imu_packet[i].type));
+        udpQueue.push(imu_packet[i]);
+        slamQueue.push(imu_packet[i]);
         // printf("[ imu]ts=%f, t=%2.2f, ax=%6.2f, ay=%6.2f, az=%6.2f, gx=%8.4f, gy=%8.4f, gz=%8.4f\n",
         //        imu_data[i].data.timestamp / 19200000.0f, imu_data[i].data.temp,
         //        imu_data[i].data.ax, imu_data[i].data.ay, imu_data[i].data.az,
         //        imu_data[i].data.gx, imu_data[i].data.gy, imu_data[i].data.gz);
-        // sendto(udp_sock, &imu_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
-        imu_file << imu_packet[i].timestamp << ","
-                 << imu_packet[i].imu.temp << ","
-                 << imu_packet[i].imu.ax << ","
-                 << imu_packet[i].imu.ay << ","
-                 << imu_packet[i].imu.az << ","
-                 << imu_packet[i].imu.gx << ","
-                 << imu_packet[i].imu.gy << ","
-                 << imu_packet[i].imu.gz << std::endl;
-
-        madgwick_filter.updateIMU(imu_packet[i].imu.gx, imu_packet[i].imu.gy, imu_packet[i].imu.gz,
-                                  imu_packet[i].imu.ax, imu_packet[i].imu.ay, imu_packet[i].imu.az);
-        float q[4];
-        madgwick_filter.getQuaternion(q);
-        // printf("[pose]ts=%f, x=0.0,y=0.0, z=0.0, qx=%f, qy=%f, qz=%f, qw=%f\n",
-        //        imu_data[i].timestamp / 19200000.0f, q[0], q[1], q[2], q[3]);
-
-        pose_packet[i].type = PacketType::POSE;
-        pose_packet[i].timestamp = imu_packet[i].timestamp;
-        pose_packet[i].pose.x = 0.0f; pose_packet[i].pose.y = 0.0f; pose_packet[i].pose.z = 0.0f;
-        pose_packet[i].pose.qx = q[1]; pose_packet[i].pose.qy = q[2]; pose_packet[i].pose.qz = q[3]; pose_packet[i].pose.qw = q[0];
-        // sendto(udp_sock, &pose_packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
     }
     return 0;
 }
@@ -174,15 +122,8 @@ static int uwb_read_callback(uint32_t ev_type,
         if (packet[i].uwb.anchor_id < 0) {
             continue;
         }
-        // fileQueue.push(packet[i]);
-        // udpQueue.push(packet[i]);
-        // sendto(udp_sock, &packet[i], sizeof(Packet), 0, (struct sockaddr*)&udp_addr, sizeof(udp_addr));
-        // uwb_file << packet[i].timestamp << ","
-        //          << static_cast<int>(packet[i].uwb.anchor_id) << ","
-        //          << static_cast<int>(packet[i].uwb.nlos) << ","
-        //          << packet[i].uwb.distance << ","
-        //          << packet[i].uwb.azimuth << ","
-        //          << packet[i].uwb.elevation << std::endl;
+        fileQueue.push(packet[i]);
+        udpQueue.push(packet[i]);
         // printf("[ uwb]ts=%f, i=%hhd, n=%hhu, d=%6.2f, a=%6.2f, e=%6.2f\n",
         //        packet[i].timestamp, packet[i].uwb.anchor_id,
         //        packet[i].uwb.nlos, packet[i].uwb.distance,
@@ -211,7 +152,6 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
 
     madgwick_filter.begin(IMU_SAMPLING_FREQUENCY);
 
-
     pthread_attr_t attr;
     struct sched_param sch_param;
     pthread_attr_init(&attr);
@@ -219,9 +159,12 @@ extern "C" int uwbins_main(int argc, FAR char *argv[]) {
     attr.stacksize = 1024 * 2;
     pthread_attr_setschedparam(&attr, &sch_param);
     pthread_attr_setschedpolicy(&attr, SCHED_RR);
-    pthread_t log_thread, net_thread;
+    pthread_t log_thread, net_thread, slam_thread;
     pthread_create(&log_thread, &attr, file_writer_thread, NULL);
     pthread_create(&net_thread, &attr, udp_sender_thread, NULL);
+    pthread_create(&slam_thread, &attr, slam_est_thread, NULL);
+
+    pose_packet = std::make_unique<Packet>();
 
 
     physical_sensor_t *imu = ImuSensorCreate(imu_read_callback);

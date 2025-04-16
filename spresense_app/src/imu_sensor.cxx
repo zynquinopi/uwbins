@@ -71,6 +71,9 @@ int ImuSensorClass::open_sensor() {
     }
     fds[0].fd = m_fd;
     fds[0].events = POLLIN;
+
+    out = std::unique_ptr<Packet[]>(new Packet[IMU_NUM_FIFO]);
+    ptr = std::unique_ptr<char[]>(new char[sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO]);
     return 0;
 }
 
@@ -127,9 +130,6 @@ int ImuSensorClass::setup_sensor(FAR void *param) {
 
 
 int ImuSensorClass::read_data() {
-    std::unique_ptr<Packet[]> out(new Packet[IMU_NUM_FIFO]);
-    std::unique_ptr<char[]> ptr(new char[sizeof(cxd5602pwbimu_data_t) * IMU_NUM_FIFO]);
-    
     /* Read imu data from driver. */
     int ret = poll(fds, 1, 1000);
     if (ret < 0) {

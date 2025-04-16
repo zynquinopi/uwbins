@@ -16,7 +16,7 @@ CXXSRCS = \
 	src/uwb_sensor.cxx \
 	src/MadgwickAHRS.cxx \
 	src/file_logger.cxx \
-# gnss_sensor.cxx
+	src/gpio_led.cxx \
 
 CXXFLAGS += -D_POSIX
 CXXFLAGS += -DUSE_MEMMGR_FENCE

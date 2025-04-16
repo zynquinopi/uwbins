@@ -2,6 +2,7 @@
 #define _UWBINS_UWB_SENSOR_H
 
 #include <poll.h>
+#include <memory>
 
 #include "include/types.h"
 #include "physical_sensor.h"
@@ -42,6 +43,9 @@ private:
 
     int m_fd;
     struct pollfd fds[1];
+    std::unique_ptr<char[]> buffer;
+    std::unique_ptr<Type2bp[]> data_array;
+    std::unique_ptr<Packet[]> out;
 };
 
 #endif /* _EXAMPLES_UWBINS_UWB_SENSOR_H */

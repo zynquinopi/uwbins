@@ -73,6 +73,10 @@ int UwbSensorClass::open_sensor() {
     }
     fds[0].fd = m_fd;
     fds[0].events = POLLIN;
+
+    buffer = std::unique_ptr<char[]>(new char[512]);
+    data_array = std::unique_ptr<Type2bp[]>(new Type2bp[UWB_NUM_ANCHOR]);
+    out = std::unique_ptr<Packet[]>(new Packet[UWB_NUM_ANCHOR]);
     return 0;
 }
 
@@ -140,7 +144,6 @@ int UwbSensorClass::setup_sensor(FAR void *param) {
 
 
 int UwbSensorClass::read_data() {
-    std::unique_ptr<char[]> buffer(new char[512]);
     size_t buffer_index = 0;
 
     tcflush(m_fd, TCIFLUSH);
@@ -169,9 +172,7 @@ int UwbSensorClass::read_data() {
                 // buffer[buffer_index++] = byte;
                 // if (byte == '\n') {
                     buffer[num_bufers] = '\0';
-                    std::unique_ptr<Type2bp[]> data_array(new Type2bp[UWB_NUM_ANCHOR]);
                     parse_uwb_data(buffer.get(), data_array.get());
-                    std::unique_ptr<Packet[]> out(new Packet[UWB_NUM_ANCHOR]);
                     for (int i = 0; i < UWB_NUM_ANCHOR; i++) {
                         out[i].type = PacketType::UWB;
                         out[i].timestamp = get_us_timestamp();
